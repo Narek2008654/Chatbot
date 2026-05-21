@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getMemories, deleteMemory, type Memory as MemoryItem } from "@/lib/api";
+import { type Memory as MemoryItem } from "@/lib/api";
+import { useApi } from "@/lib/useApi";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,19 +29,20 @@ function formatDate(dateStr: string) {
 
 export function Memory() {
   const queryClient = useQueryClient();
+  const api = useApi();
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const { data: memories = [] } = useQuery<MemoryItem[]>({
     queryKey: ["memories"],
-    queryFn: getMemories,
+    queryFn: api.getMemories,
   });
 
   async function handleDelete() {
     if (!confirmId) return;
     setDeleting(true);
     try {
-      await deleteMemory(confirmId);
+      await api.deleteMemory(confirmId);
       await queryClient.invalidateQueries({ queryKey: ["memories"] });
       toast.success("Memory deleted");
     } catch (err) {

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
 import { toast } from "sonner";
-import { getMessages, createChat, type Message } from "@/lib/api";
+import { type Message } from "@/lib/api";
+import { useApi } from "@/lib/useApi";
 import { streamChat } from "@/lib/streamChat";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatSidebar } from "@/components/ChatSidebar";
@@ -10,6 +12,8 @@ import { MessageInput } from "@/components/MessageInput";
 
 export function Chat() {
   const queryClient = useQueryClient();
+  const api = useApi();
+  const { getToken } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<
     { role: "user" | "assistant"; content: string }[]
@@ -19,7 +23,7 @@ export function Chat() {
 
   const { data: fetchedMessages = [] } = useQuery<Message[]>({
     queryKey: ["messages", selectedId],
-    queryFn: () => getMessages(selectedId!),
+    queryFn: () => api.getMessages(selectedId!),
     enabled: !!selectedId,
   });
 
@@ -46,7 +50,7 @@ export function Chat() {
     let chatId = selectedId;
 
     if (!chatId) {
-      const chat = await createChat();
+      const chat = await api.createChat();
       await queryClient.invalidateQueries({ queryKey: ["chats"] });
       chatId = chat.id;
       setSelectedId(chatId);
@@ -62,8 +66,9 @@ export function Chat() {
     setStreaming("");
 
     const activeChatId = chatId;
+    const token = await getToken();
 
-    await streamChat(activeChatId, text, {
+    await streamChat(activeChatId, text, token, {
       onChunk: (chunk) => {
         setStreaming((s) => s + chunk);
       },

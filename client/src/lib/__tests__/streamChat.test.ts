@@ -25,19 +25,26 @@ describe("streamChat", () => {
     vi.restoreAllMocks();
   });
 
-  it("calls onChunk for each text chunk and onDone at completion", async () => {
+  it("calls onChunk for each text chunk and onDone at completion, sending the bearer token", async () => {
     const sse =
       'data: {"text":"Hello"}\n\n' +
       'data: {"text":" world"}\n\n' +
       "event: done\ndata: {}\n\n";
 
-    vi.stubGlobal("fetch", () => makeFetchOk(makeStream([sse])));
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      makeFetchOk(makeStream([sse])),
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
     const onChunk = vi.fn();
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
+
+    // Sends the Clerk session token as a bearer header
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer test-token");
 
     expect(onChunk).toHaveBeenCalledTimes(2);
     expect(onChunk).toHaveBeenNthCalledWith(1, "Hello");
@@ -57,7 +64,7 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
 
     expect(onChunk).toHaveBeenCalledTimes(2);
     expect(onChunk).toHaveBeenNthCalledWith(1, "Hello");
@@ -80,7 +87,7 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onChunk).not.toHaveBeenCalled();
@@ -96,7 +103,7 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith("model exploded");

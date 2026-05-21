@@ -21,13 +21,13 @@ export interface Memory {
   createdAt: string;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, token: string | null, options?: RequestInit): Promise<T> {
   const { headers: callerHeaders, ...restOptions } = options ?? {};
   const res = await fetch(`${API_URL}${path}`, {
-    credentials: "include",
     ...restOptions,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(callerHeaders as Record<string, string> | undefined),
     },
   });
@@ -40,29 +40,29 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function getChats(): Promise<Chat[]> {
-  return request<Chat[]>("/api/chats");
+export function getChats(token: string | null): Promise<Chat[]> {
+  return request<Chat[]>("/api/chats", token);
 }
 
-export function createChat(title?: string): Promise<Chat> {
-  return request<Chat>("/api/chats", {
+export function createChat(token: string | null, title?: string): Promise<Chat> {
+  return request<Chat>("/api/chats", token, {
     method: "POST",
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(title ? { title } : {}),
   });
 }
 
-export function deleteChat(id: string): Promise<void> {
-  return request<void>(`/api/chats/${id}`, { method: "DELETE" });
+export function deleteChat(token: string | null, id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/chats/${id}`, token, { method: "DELETE" });
 }
 
-export function getMessages(chatId: string): Promise<Message[]> {
-  return request<Message[]>(`/api/chats/${chatId}/messages`);
+export function getMessages(token: string | null, chatId: string): Promise<Message[]> {
+  return request<Message[]>(`/api/chats/${chatId}/messages`, token);
 }
 
-export function getMemories(): Promise<Memory[]> {
-  return request<Memory[]>("/api/memory");
+export function getMemories(token: string | null): Promise<Memory[]> {
+  return request<Memory[]>("/api/memory", token);
 }
 
-export function deleteMemory(id: string): Promise<void> {
-  return request<void>(`/api/memory/${id}`, { method: "DELETE" });
+export function deleteMemory(token: string | null, id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/memory/${id}`, token, { method: "DELETE" });
 }

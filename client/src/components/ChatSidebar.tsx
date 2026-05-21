@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getChats, createChat, deleteChat } from "@/lib/api";
+import { useApi } from "@/lib/useApi";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,21 +12,22 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ selectedId, onSelect, onDeselect }: ChatSidebarProps) {
   const queryClient = useQueryClient();
+  const api = useApi();
 
   const { data: chats = [] } = useQuery({
     queryKey: ["chats"],
-    queryFn: getChats,
+    queryFn: api.getChats,
   });
 
   async function handleNewChat() {
-    const chat = await createChat();
+    const chat = await api.createChat();
     await queryClient.invalidateQueries({ queryKey: ["chats"] });
     onSelect(chat.id);
   }
 
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    await deleteChat(id);
+    await api.deleteChat(id);
     await queryClient.invalidateQueries({ queryKey: ["chats"] });
     if (selectedId === id) {
       onDeselect();

@@ -9,6 +9,7 @@ export interface StreamHandlers {
 export async function streamChat(
   chatId: string,
   content: string,
+  token: string | null,
   handlers: StreamHandlers,
 ): Promise<void> {
   let res: Response;
@@ -16,10 +17,10 @@ export async function streamChat(
   try {
     res = await fetch(`${API_URL}/api/chats/${chatId}/stream`, {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ content }),
     });

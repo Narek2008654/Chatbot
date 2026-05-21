@@ -1,28 +1,23 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AppHeader } from "../AppHeader";
 
-vi.mock("@/lib/authClient", () => ({
-  useSession: () => ({ data: { user: { email: "user@example.com" } } }),
-  signOut: vi.fn(),
+// Clerk's UserButton is replaced with a stub so the header renders in jsdom.
+vi.mock("@clerk/clerk-react", () => ({
+  UserButton: () => <div>user-button</div>,
 }));
 
 describe("AppHeader", () => {
-  it("opens the user menu without crashing and shows the email + sign out", async () => {
-    const user = userEvent.setup();
+  it("renders the title, nav link, and the Clerk user button", () => {
     render(
       <MemoryRouter>
         <AppHeader navLink={{ to: "/memory", label: "Memory" }} />
       </MemoryRouter>
     );
 
-    // Opening the menu renders the email label; this used to throw a
-    // "MenuGroupContext is missing" error when the label wasn't inside a group.
-    await user.click(screen.getByRole("button"));
-
-    expect(await screen.findByText("user@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Sign out")).toBeInTheDocument();
+    expect(screen.getByText("AI Chatbot")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Memory" })).toBeInTheDocument();
+    expect(screen.getByText("user-button")).toBeInTheDocument();
   });
 });
