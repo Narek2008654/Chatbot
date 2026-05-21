@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuGroup,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { LogOutIcon } from "lucide-react";
@@ -47,9 +48,11 @@ export function AppHeader({ navLink }: AppHeaderProps) {
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel className="truncate max-w-[180px]">
-              {email}
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate max-w-[180px]">
+                {email}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
