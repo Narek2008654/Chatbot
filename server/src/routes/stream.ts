@@ -36,31 +36,43 @@ export function createStreamRouter(getAi: () => AiClient): Router {
       return;
     }
 
-    // 2. Load prior history BEFORE inserting the new user message
-    const priorMessages = await prisma.message.findMany({
-      where: { chatId },
-      orderBy: { createdAt: "asc" },
-      take: 20,
-      select: { role: true, content: true },
-    });
+    // Prepare the turn (DB + memory recall + prompt) BEFORE switching to SSE,
+    // so any failure here (DB error, missing/invalid OpenAI key, embedding call)
+    // returns a clean JSON error instead of an opaque 500 mid-stream.
+    let ai: AiClient;
+    let system: string;
+    let messages: ChatMessage[];
+    try {
+      // 2. Load prior history BEFORE inserting the new user message
+      const priorMessages = await prisma.message.findMany({
+        where: { chatId },
+        orderBy: { createdAt: "asc" },
+        take: 20,
+        select: { role: true, content: true },
+      });
 
-    const priorHistory: ChatMessage[] = priorMessages.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+      const priorHistory: ChatMessage[] = priorMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
 
-    // 3. Insert the new user message
-    await prisma.message.create({
-      data: { chatId, role: "user", content },
-    });
+      // 3. Insert the new user message
+      await prisma.message.create({
+        data: { chatId, role: "user", content },
+      });
 
-    const ai = getAi();
+      ai = getAi();
 
-    // 4. Search memories
-    const facts = await searchMemories(ai, req.user!.id, content, 5);
+      // 4. Search memories
+      const facts = await searchMemories(ai, req.user!.id, content, 5);
 
-    // 5. Build prompt
-    const { system, messages } = buildPrompt({ facts, history: priorHistory, message: content });
+      // 5. Build prompt
+      ({ system, messages } = buildPrompt({ facts, history: priorHistory, message: content }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to prepare turn";
+      res.status(500).json({ error: message });
+      return;
+    }
 
     // 6. Set SSE headers and flush
     res.setHeader("Content-Type", "text/event-stream");
