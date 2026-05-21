@@ -2,60 +2,31 @@ import request from "supertest";
 import { createApp } from "../app.js";
 import { prisma } from "../db.js";
 import { createFakeAi } from "../ai/fakeAi.js";
+import { fakeAuth } from "../test/fakeAuth.js";
 import { addMemory } from "../memory/store.js";
 
 const fakeAi = createFakeAi();
-const app = createApp({ ai: fakeAi });
+const app = createApp({ ai: fakeAi, requireAuth: fakeAuth });
 
-const USER1_EMAIL = "memory-route-user1@example-test.invalid";
-const USER2_EMAIL = "memory-route-user2@example-test.invalid";
-const PASSWORD = "password123";
-const NAME = "MemUser";
+const USER1 = "user_test_mem_1";
+const USER2 = "user_test_mem_2";
 
-async function signUp(email: string): Promise<string[]> {
-  const res = await request(app)
-    .post("/api/auth/sign-up/email")
-    .send({ email, password: PASSWORD, name: NAME });
-  const rawCookies = res.headers["set-cookie"];
-  const cookies: string[] = Array.isArray(rawCookies)
-    ? rawCookies
-    : [rawCookies as string];
-  return cookies;
+async function cleanup() {
+  await prisma.memory.deleteMany({ where: { userId: { in: [USER1, USER2] } } });
 }
 
-async function cleanupTestUsers() {
-  await prisma.user.deleteMany({
-    where: { email: { in: [USER1_EMAIL, USER2_EMAIL] } },
-  });
-}
-
-let cookie1: string[];
-let cookie2: string[];
-let user1Id: string;
-
-beforeAll(async () => {
-  await cleanupTestUsers();
-  cookie1 = await signUp(USER1_EMAIL);
-  cookie2 = await signUp(USER2_EMAIL);
-
-  const user1 = await prisma.user.findUniqueOrThrow({
-    where: { email: USER1_EMAIL },
-  });
-  user1Id = user1.id;
-});
+beforeAll(cleanup);
 
 afterAll(async () => {
-  await cleanupTestUsers();
+  await cleanup();
   await prisma.$disconnect();
 });
 
 test("GET /api/memory lists the authenticated user's memories", async () => {
-  await addMemory(fakeAi, user1Id, "User1 likes cats");
-  await addMemory(fakeAi, user1Id, "User1 lives in Paris");
+  await addMemory(fakeAi, USER1, "User1 likes cats");
+  await addMemory(fakeAi, USER1, "User1 lives in Paris");
 
-  const res = await request(app)
-    .get("/api/memory")
-    .set("Cookie", cookie1);
+  const res = await request(app).get("/api/memory").set("x-test-user-id", USER1);
 
   expect(res.status).toBe(200);
   expect(Array.isArray(res.body)).toBe(true);
@@ -65,9 +36,7 @@ test("GET /api/memory lists the authenticated user's memories", async () => {
 });
 
 test("GET /api/memory does not return another user's memories", async () => {
-  const res = await request(app)
-    .get("/api/memory")
-    .set("Cookie", cookie2);
+  const res = await request(app).get("/api/memory").set("x-test-user-id", USER2);
 
   expect(res.status).toBe(200);
   const contents = res.body.map((m: { content: string }) => m.content);
@@ -76,18 +45,17 @@ test("GET /api/memory does not return another user's memories", async () => {
 });
 
 test("DELETE /api/memory/:id removes the memory for the owner", async () => {
-  await addMemory(fakeAi, user1Id, "Fact to delete");
+  await addMemory(fakeAi, USER1, "Fact to delete");
 
-  // Find the memory just added
   const memories = await prisma.memory.findMany({
-    where: { userId: user1Id, content: "Fact to delete" },
+    where: { userId: USER1, content: "Fact to delete" },
   });
   expect(memories.length).toBeGreaterThan(0);
   const memId = memories[0].id;
 
   const res = await request(app)
     .delete(`/api/memory/${memId}`)
-    .set("Cookie", cookie1);
+    .set("x-test-user-id", USER1);
 
   expect(res.status).toBe(200);
   expect(res.body).toEqual({ ok: true });
@@ -97,16 +65,16 @@ test("DELETE /api/memory/:id removes the memory for the owner", async () => {
 });
 
 test("DELETE /api/memory/:id returns 404 when another user tries to delete", async () => {
-  await addMemory(fakeAi, user1Id, "Protected fact");
+  await addMemory(fakeAi, USER1, "Protected fact");
 
   const memories = await prisma.memory.findMany({
-    where: { userId: user1Id, content: "Protected fact" },
+    where: { userId: USER1, content: "Protected fact" },
   });
   const memId = memories[0].id;
 
   const res = await request(app)
     .delete(`/api/memory/${memId}`)
-    .set("Cookie", cookie2);
+    .set("x-test-user-id", USER2);
 
   expect(res.status).toBe(404);
   expect(res.body).toEqual({ error: "not found" });

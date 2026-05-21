@@ -4,30 +4,19 @@ import { createFakeAi } from "../../ai/fakeAi.js";
 import { addMemory, searchMemories } from "../store.js";
 import { randomUUID } from "crypto";
 
+// User identity now comes from Clerk — userId is a free-form string with no
+// local User table/FK, so tests use plain ids directly.
 const USER1_ID = `test-mem-user1-${randomUUID()}`;
 const USER2_ID = `test-mem-user2-${randomUUID()}`;
-const USER1_EMAIL = `mem-test-user1-${Date.now()}@example.com`;
-const USER2_EMAIL = `mem-test-user2-${Date.now()}@example.com`;
 
-beforeAll(async () => {
-  // Clean up any leftovers from a previous run
-  await prisma.user.deleteMany({
-    where: { email: { in: [USER1_EMAIL, USER2_EMAIL] } },
-  });
-  // Create test users
-  await prisma.user.create({
-    data: { id: USER1_ID, email: USER1_EMAIL, name: "Test User 1" },
-  });
-  await prisma.user.create({
-    data: { id: USER2_ID, email: USER2_EMAIL, name: "Test User 2" },
-  });
-});
+async function cleanup() {
+  await prisma.memory.deleteMany({ where: { userId: { in: [USER1_ID, USER2_ID] } } });
+}
+
+beforeAll(cleanup);
 
 afterAll(async () => {
-  // Cascade deletes memories too
-  await prisma.user.deleteMany({
-    where: { email: { in: [USER1_EMAIL, USER2_EMAIL] } },
-  });
+  await cleanup();
   await prisma.$disconnect();
 });
 

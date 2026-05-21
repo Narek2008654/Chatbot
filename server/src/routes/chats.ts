@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { requireAuth } from "../middleware/requireAuth.js";
 import type { AiClient } from "../ai/client.js";
 import { createStreamRouter } from "./stream.js";
 
@@ -11,9 +10,6 @@ const createChatSchema = z.object({
 
 export function createChatsRouter(getAi: () => AiClient): Router {
   const router = Router();
-
-  // All routes require authentication
-  router.use(requireAuth);
 
   // POST / — create a chat
   router.post("/", async (req, res) => {
@@ -26,7 +22,7 @@ export function createChatsRouter(getAi: () => AiClient): Router {
     const { title } = parsed.data;
     const chat = await prisma.chat.create({
       data: {
-        userId: req.user!.id,
+        userId: req.userId!,
         title,
       },
       select: {
@@ -43,7 +39,7 @@ export function createChatsRouter(getAi: () => AiClient): Router {
   // GET / — list user's chats, newest first
   router.get("/", async (req, res) => {
     const chats = await prisma.chat.findMany({
-      where: { userId: req.user!.id },
+      where: { userId: req.userId! },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -59,7 +55,7 @@ export function createChatsRouter(getAi: () => AiClient): Router {
   // GET /:id — return a single chat if owned
   router.get("/:id", async (req, res) => {
     const chat = await prisma.chat.findFirst({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id: req.params.id, userId: req.userId! },
       select: {
         id: true,
         title: true,
@@ -79,7 +75,7 @@ export function createChatsRouter(getAi: () => AiClient): Router {
   // DELETE /:id — delete if owned (owner-scoped, atomic)
   router.delete("/:id", async (req, res) => {
     const { count } = await prisma.chat.deleteMany({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id: req.params.id, userId: req.userId! },
     });
 
     if (count === 0) {
@@ -93,7 +89,7 @@ export function createChatsRouter(getAi: () => AiClient): Router {
   // GET /:id/messages — return messages for owned chat
   router.get("/:id/messages", async (req, res) => {
     const chat = await prisma.chat.findFirst({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id: req.params.id, userId: req.userId! },
     });
 
     if (!chat) {

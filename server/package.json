@@ -12,8 +12,8 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@clerk/express": "^1.0.0",
     "@prisma/client": "^6.9.0",
-    "better-auth": "^1.2.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",

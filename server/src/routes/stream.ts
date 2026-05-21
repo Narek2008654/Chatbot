@@ -28,7 +28,7 @@ export function createStreamRouter(getAi: () => AiClient): Router {
 
     // 1. Verify the chat exists and is owned by the user
     const chat = await prisma.chat.findFirst({
-      where: { id: chatId, userId: req.user!.id },
+      where: { id: chatId, userId: req.userId! },
     });
 
     if (!chat) {
@@ -67,7 +67,7 @@ export function createStreamRouter(getAi: () => AiClient): Router {
       ai = getAi();
 
       // 4. Search memories
-      const facts = await searchMemories(ai, req.user!.id, content, 5);
+      const facts = await searchMemories(ai, req.userId!, content, 5);
 
       // 5. Build prompt
       ({ system, messages } = buildPrompt({ facts, history: priorHistory, message: content }));
@@ -125,7 +125,7 @@ export function createStreamRouter(getAi: () => AiClient): Router {
 
       // 8. Fire-and-forget memory capture
       extractFacts(ai, content, full)
-        .then((fs) => Promise.all(fs.map((f) => addMemory(ai, req.user!.id, f))))
+        .then((fs) => Promise.all(fs.map((f) => addMemory(ai, req.userId!, f))))
         .catch(() => {});
     } catch (err) {
       const message = err instanceof Error ? err.message : "stream error";

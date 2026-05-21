@@ -1,15 +1,15 @@
-import express from "express";
+import express, { type RequestHandler } from "express";
 import cors from "cors";
-import { toNodeHandler } from "better-auth/node";
+import { clerkMiddleware } from "@clerk/express";
 import { env } from "./env.js";
-import { auth } from "./auth.js";
-import { requireAuth } from "./middleware/requireAuth.js";
+import "./middleware/requireAuth.js";
+import { clerkAuth } from "./middleware/clerkAuth.js";
 import type { AiClient } from "./ai/client.js";
 import { createOpenAiClient } from "./ai/client.js";
 import { createChatsRouter } from "./routes/chats.js";
 import { createMemoryRouter } from "./routes/memory.js";
 
-export function createApp(opts: { ai?: AiClient } = {}) {
+export function createApp(opts: { ai?: AiClient; requireAuth?: RequestHandler } = {}) {
   let cachedReal: AiClient | undefined;
 
   function getAi(): AiClient {
@@ -18,24 +18,24 @@ export function createApp(opts: { ai?: AiClient } = {}) {
 
   const app = express();
 
-  app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+  app.use(cors({ origin: env.CLIENT_URL }));
 
-  // Mount Better Auth handler BEFORE express.json() so it receives the raw body.
-  // Express 5 wildcard syntax: *splat
-  app.all("/api/auth/*splat", toNodeHandler(auth));
-
-  app.use(express.json());
-
+  // Health must be registered BEFORE Clerk middleware so it works without Clerk keys.
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
   });
 
-  app.get("/api/me", requireAuth, (req, res) => {
-    res.json({ user: req.user });
-  });
+  // Determine the auth guard to use.
+  // When a custom requireAuth is injected (e.g. tests), skip clerkMiddleware entirely.
+  const guard = opts.requireAuth ?? clerkAuth;
+  if (!opts.requireAuth) {
+    app.use(clerkMiddleware());
+  }
 
-  app.use("/api/chats", createChatsRouter(getAi));
-  app.use("/api/memory", createMemoryRouter());
+  app.use(express.json());
+
+  app.use("/api/chats", guard, createChatsRouter(getAi));
+  app.use("/api/memory", guard, createMemoryRouter());
 
   return app;
 }
