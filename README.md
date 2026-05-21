@@ -1,12 +1,12 @@
 # Chatbot
 
-A Gemini-powered chat application with memory, built with Express, React, Prisma, and pgvector.
+An OpenAI-powered chat application with memory, built with Express, React, Prisma, and pgvector.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) (for Postgres + pgvector)
 - [Node.js](https://nodejs.org/) v24+
-- A [Gemini API key](https://aistudio.google.com/app/apikey)
+- An [OpenAI API key](https://platform.openai.com/api-keys)
 
 ## Getting started
 
@@ -26,7 +26,7 @@ A Gemini-powered chat application with memory, built with Express, React, Prisma
 
    Open `server/.env` and fill in at minimum:
    - `BETTER_AUTH_SECRET` — generate with `openssl rand -hex 32`
-   - `GEMINI_API_KEY` — from Google AI Studio
+   - `OPENAI_API_KEY` — from the OpenAI platform
 
 3. **Start the database**
 
