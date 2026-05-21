@@ -37,9 +37,9 @@ export async function extractFacts(
   assistantMessage: string
 ): Promise<string[]> {
   const prompt = buildExtractionPrompt(userMessage, assistantMessage);
-  const raw = await ai.complete(prompt);
 
   try {
+    const raw = await ai.complete(prompt);
     const cleaned = stripJsonFences(raw);
     const parsed: unknown = JSON.parse(cleaned);
     if (!Array.isArray(parsed)) return [];

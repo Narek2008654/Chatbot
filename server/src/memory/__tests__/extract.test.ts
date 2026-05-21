@@ -60,4 +60,14 @@ describe("extractFacts", () => {
     const facts = await extractFacts(ai, "hello", "hi");
     expect(facts).toEqual(["User is named Sam"]);
   });
+
+  it("returns [] when the AI call itself rejects", async () => {
+    const ai = createFakeAi({
+      complete: async () => {
+        throw new Error("network failure");
+      },
+    });
+    const facts = await extractFacts(ai, "hello", "hi");
+    expect(facts).toEqual([]);
+  });
 });
