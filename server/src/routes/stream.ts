@@ -1,11 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import type { AiClient } from "../ai/client.js";
+import type { AiClient, ChatMessage } from "../ai/client.js";
 import { searchMemories, addMemory } from "../memory/store.js";
 import { buildPrompt } from "../chat/prompt.js";
 import { extractFacts } from "../memory/extract.js";
-import type { ChatMessage } from "../ai/client.js";
 
 const streamBodySchema = z.object({
   content: z.string().min(1),
