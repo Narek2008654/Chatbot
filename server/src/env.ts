@@ -9,6 +9,7 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   CHAT_MODEL: z.string().default("gpt-4o-mini"),
   EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
+  RETELL_API_KEY: z.string().optional(),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.string().default("development"),
 });
