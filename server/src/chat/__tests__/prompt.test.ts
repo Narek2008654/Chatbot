@@ -55,4 +55,24 @@ describe("buildPrompt", () => {
     expect(system).toContain("- Likes hiking");
     expect(system).toContain("- Lives in NYC");
   });
+
+  it("attaches image data URLs to the new user message", () => {
+    const url = "data:image/png;base64,X";
+    const { messages } = buildPrompt({
+      facts: [],
+      history: [],
+      message: "what is this",
+      images: [url],
+    });
+    expect(messages[messages.length - 1]).toEqual({
+      role: "user",
+      content: "what is this",
+      imageDataUrls: [url],
+    });
+  });
+
+  it("leaves imageDataUrls undefined when no images are passed", () => {
+    const { messages } = buildPrompt({ facts: [], history: [], message: "hi" });
+    expect(messages[messages.length - 1].imageDataUrls).toBeUndefined();
+  });
 });

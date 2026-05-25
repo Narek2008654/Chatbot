@@ -6,8 +6,10 @@ export function buildPrompt(input: {
   facts: string[];
   history: ChatMessage[];
   message: string;
+  /** Data URLs of images attached to the new user message (for vision). */
+  images?: string[];
 }): { system: string; messages: ChatMessage[] } {
-  const { facts, history, message } = input;
+  const { facts, history, message, images } = input;
 
   let system = BASE_SYSTEM;
   if (facts.length > 0) {
@@ -15,10 +17,10 @@ export function buildPrompt(input: {
     system += `\n\nWhat you know about the user:\n${bullets}`;
   }
 
-  const messages: ChatMessage[] = [
-    ...history,
-    { role: "user", content: message },
-  ];
+  const userMessage: ChatMessage = { role: "user", content: message };
+  if (images && images.length > 0) {
+    userMessage.imageDataUrls = images;
+  }
 
-  return { system, messages };
+  return { system, messages: [...history, userMessage] };
 }
