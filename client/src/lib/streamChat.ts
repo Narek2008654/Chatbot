@@ -10,6 +10,7 @@ export async function streamChat(
   chatId: string,
   content: string,
   token: string | null,
+  attachmentIds: string[],
   handlers: StreamHandlers,
 ): Promise<void> {
   let res: Response;
@@ -22,7 +23,7 @@ export async function streamChat(
         Accept: "text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, attachmentIds }),
     });
   } catch (err) {
     handlers.onError(String(err));
@@ -55,7 +56,7 @@ export async function streamChat(
         if (!rawEvent.trim()) continue;
 
         let eventType = "";
-        let dataLines: string[] = [];
+        const dataLines: string[] = [];
 
         for (const line of rawEvent.split("\n")) {
           if (line.startsWith("event:")) {

@@ -1,10 +1,18 @@
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AuthedImage } from "@/components/AuthedImage";
+
+interface Attachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+}
 
 interface MessageItem {
   role: "user" | "assistant";
   content: string;
+  attachments?: Attachment[];
 }
 
 interface MessageListProps {
@@ -12,7 +20,7 @@ interface MessageListProps {
   streaming?: string;
 }
 
-function MessageBubble({ role, content }: MessageItem) {
+function MessageBubble({ role, content, attachments }: MessageItem) {
   const isUser = role === "user";
 
   return (
@@ -24,6 +32,18 @@ function MessageBubble({ role, content }: MessageItem) {
             : "bg-muted text-foreground"
         }`}
       >
+        {attachments && attachments.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachments.map((a) => (
+              <AuthedImage
+                key={a.id}
+                id={a.id}
+                alt={a.filename}
+                className="max-h-48 rounded-lg object-cover"
+              />
+            ))}
+          </div>
+        )}
         {isUser ? (
           <p className="whitespace-pre-wrap">{content}</p>
         ) : (
@@ -49,7 +69,12 @@ export function MessageList({ messages, streaming }: MessageListProps) {
     <ScrollArea className="flex-1 overflow-hidden">
       <div className="p-4">
         {messages.map((msg, idx) => (
-          <MessageBubble key={idx} role={msg.role} content={msg.content} />
+          <MessageBubble
+            key={idx}
+            role={msg.role}
+            content={msg.content}
+            attachments={msg.attachments}
+          />
         ))}
         {showStreaming && (
           <MessageBubble role="assistant" content={streaming!} />

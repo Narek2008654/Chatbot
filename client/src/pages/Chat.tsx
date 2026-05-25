@@ -46,7 +46,7 @@ export function Chat() {
   const displayMessages =
     optimisticMessages.length > 0 ? optimisticMessages : fetchedMessages;
 
-  async function handleSend(text: string) {
+  async function handleSend(text: string, attachmentIds: string[]) {
     let chatId = selectedId;
 
     if (!chatId) {
@@ -56,7 +56,8 @@ export function Chat() {
       setSelectedId(chatId);
     }
 
-    // Optimistically show user message on top of persisted ones
+    // Optimistically show user message on top of persisted ones (attached images
+    // appear once the thread refetches on done).
     const baseMessages: { role: "user" | "assistant"; content: string }[] =
       fetchedMessages.map((m) => ({ role: m.role, content: m.content }));
     const withUserMessage = [...baseMessages, { role: "user" as const, content: text }];
@@ -68,7 +69,7 @@ export function Chat() {
     const activeChatId = chatId;
     const token = await getToken();
 
-    await streamChat(activeChatId, text, token, {
+    await streamChat(activeChatId, text, token, attachmentIds, {
       onChunk: (chunk) => {
         setStreaming((s) => s + chunk);
       },

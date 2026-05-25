@@ -40,11 +40,13 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", ["a1"], { onChunk, onDone, onError });
 
     // Sends the Clerk session token as a bearer header
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer test-token");
+    // Sends the attachment ids in the body
+    expect(JSON.parse(init.body as string)).toEqual({ content: "hi", attachmentIds: ["a1"] });
 
     expect(onChunk).toHaveBeenCalledTimes(2);
     expect(onChunk).toHaveBeenNthCalledWith(1, "Hello");
@@ -64,7 +66,7 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", [], { onChunk, onDone, onError });
 
     expect(onChunk).toHaveBeenCalledTimes(2);
     expect(onChunk).toHaveBeenNthCalledWith(1, "Hello");
@@ -87,7 +89,7 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", [], { onChunk, onDone, onError });
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onChunk).not.toHaveBeenCalled();
@@ -103,7 +105,7 @@ describe("streamChat", () => {
     const onDone = vi.fn();
     const onError = vi.fn();
 
-    await streamChat("chat-1", "hi", "test-token", { onChunk, onDone, onError });
+    await streamChat("chat-1", "hi", "test-token", [], { onChunk, onDone, onError });
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith("model exploded");

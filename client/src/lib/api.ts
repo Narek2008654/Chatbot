@@ -7,12 +7,19 @@ export interface Chat {
   updatedAt: string;
 }
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+}
+
 export interface Message {
   id: string;
   chatId: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  attachments?: Attachment[];
 }
 
 export interface Memory {
@@ -65,4 +72,28 @@ export function getMemories(token: string | null): Promise<Memory[]> {
 
 export function deleteMemory(token: string | null, id: string): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/api/memory/${id}`, token, { method: "DELETE" });
+}
+
+export async function uploadFile(token: string | null, file: File): Promise<Attachment> {
+  const form = new FormData();
+  form.append("file", file);
+  // Do NOT set Content-Type — the browser sets the multipart boundary.
+  const res = await fetch(`${API_URL}/api/uploads`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
+  }
+  return res.json() as Promise<Attachment>;
+}
+
+export async function getFileBlob(token: string | null, id: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}/api/files/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.blob();
 }
