@@ -99,17 +99,65 @@ export function Chat() {
         />
         <main className="flex flex-1 flex-col overflow-hidden">
           {selectedId ? (
-            <>
-              <MessageList messages={displayMessages} streaming={streaming} />
-              <MessageInput onSend={handleSend} disabled={isStreaming} />
-            </>
+            <MessageList
+              messages={displayMessages}
+              streaming={streaming}
+              loading={isStreaming}
+            />
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-              <p className="text-sm">Select or create a chat to get started.</p>
-              <MessageInput onSend={handleSend} disabled={isStreaming} />
-            </div>
+            <Welcome onPick={(text) => handleSend(text, [])} disabled={isStreaming} />
           )}
+          <MessageInput onSend={handleSend} disabled={isStreaming} />
         </main>
+      </div>
+    </div>
+  );
+}
+
+const SUGGESTIONS = [
+  "Explain a tricky concept simply",
+  "Help me draft an email",
+  "Brainstorm ideas for a project",
+  "Review and improve some code",
+];
+
+function Welcome({
+  onPick,
+  disabled,
+}: {
+  onPick: (text: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+      <div className="animate-message-in flex max-w-lg flex-col items-center">
+        <span
+          aria-hidden="true"
+          className="mb-6 flex size-14 items-center justify-center rounded-2xl bg-primary font-display text-3xl font-semibold italic leading-none text-primary-foreground shadow-md"
+        >
+          a
+        </span>
+        <h1 className="text-balance font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+          What can I help you with?
+        </h1>
+        <p className="mt-3 max-w-md text-balance font-serif text-[1.05rem] leading-relaxed text-muted-foreground">
+          Start a conversation below — ask anything, share an image, or pick a
+          starting point.
+        </p>
+
+        <div className="mt-8 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={disabled}
+              onClick={() => onPick(s)}
+              className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-card-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   SignedIn,
   SignedOut,
 } from "@clerk/clerk-react";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { Login } from "@/pages/Login";
 import { Signup } from "@/pages/Signup";
@@ -32,19 +33,21 @@ function Protected({ children }: { children: ReactNode }) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login/*" element={<Login />} />
-            <Route path="/signup/*" element={<Signup />} />
-            <Route path="/" element={<Protected><Chat /></Protected>} />
-            <Route path="/memory" element={<Protected><Memory /></Protected>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-        <Toaster />
-      </QueryClientProvider>
-    </ClerkProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login/*" element={<Login />} />
+              <Route path="/signup/*" element={<Signup />} />
+              <Route path="/" element={<Protected><Chat /></Protected>} />
+              <Route path="/memory" element={<Protected><Memory /></Protected>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster />
+        </QueryClientProvider>
+      </ClerkProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

@@ -5,7 +5,6 @@ import { type Memory as MemoryItem } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Trash2Icon } from "lucide-react";
+import { Trash2Icon, BookMarked } from "lucide-react";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString(undefined, {
@@ -57,37 +56,61 @@ export function Memory() {
     <div className="flex h-screen flex-col">
       <AppHeader navLink={{ to: "/", label: "Chat" }} />
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <h1 className="font-heading mb-6 text-xl font-semibold">Memories</h1>
+      <main className="flex-1 overflow-y-auto px-6 py-10">
+        <div className="mx-auto max-w-2xl">
+          <header className="mb-8">
+            <h1 className="font-display text-3xl font-semibold tracking-tight">
+              Memories
+            </h1>
+            <p className="mt-2 font-serif text-[1.05rem] leading-relaxed text-muted-foreground">
+              What I've remembered about you across conversations. Remove anything
+              you'd rather I forget.
+            </p>
+          </header>
 
-        {memories.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No memories yet.</p>
-        ) : (
-          <ul className="space-y-3">
-            {memories.map((mem) => (
-              <li key={mem.id}>
-                <Card>
-                  <CardContent className="flex items-start justify-between gap-4 pt-4">
-                    <div className="flex-1">
-                      <p className="text-sm">{mem.content}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatDate(mem.createdAt)}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setConfirmId(mem.id)}
-                      aria-label="Delete memory"
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        )}
+          {memories.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card/50 px-6 py-14 text-center">
+              <BookMarked className="mx-auto size-7 text-muted-foreground/60" />
+              <p className="mt-3 font-serif text-[1.05rem] italic text-muted-foreground">
+                Nothing remembered yet.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground/70">
+                As you chat, useful details will be collected here.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {memories.map((mem) => (
+                <li
+                  key={mem.id}
+                  className="group flex items-start gap-4 rounded-2xl border border-border/70 bg-card px-5 py-4 shadow-sm transition-colors hover:border-primary/40"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mt-1 h-full w-0.5 shrink-0 self-stretch rounded-full bg-primary/40"
+                  />
+                  <div className="flex-1">
+                    <p className="font-serif text-[1.05rem] leading-relaxed text-card-foreground">
+                      {mem.content}
+                    </p>
+                    <p className="mt-2 font-sans text-xs uppercase tracking-[0.1em] text-muted-foreground/70">
+                      {formatDate(mem.createdAt)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                    onClick={() => setConfirmId(mem.id)}
+                    aria-label="Delete memory"
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </main>
 
       <Dialog open={confirmId !== null} onOpenChange={(open) => !open && setConfirmId(null)}>

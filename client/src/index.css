@@ -1,47 +1,95 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+/* Atelier type system: a characterful serif display (Fraunces), a refined
+   reading serif for prose (Newsreader), and a clean grotesque for UI chrome
+   (Hanken Grotesk). */
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/hanken-grotesk";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Daybook (light): ink on warm paper ─────────────────────────────────── */
 :root {
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  --background: oklch(0.967 0.013 83);      /* warm cream paper        */
+  --foreground: oklch(0.285 0.018 55);      /* espresso ink            */
+  --card: oklch(0.992 0.006 90);            /* fresh paper (surfaces)  */
+  --card-foreground: oklch(0.285 0.018 55);
+  --popover: oklch(0.992 0.006 90);
+  --popover-foreground: oklch(0.285 0.018 55);
+  --primary: oklch(0.585 0.135 41);         /* terracotta              */
+  --primary-foreground: oklch(0.98 0.012 85);
+  --secondary: oklch(0.928 0.02 78);        /* warm tan                */
+  --secondary-foreground: oklch(0.32 0.02 55);
+  --muted: oklch(0.935 0.016 80);
+  --muted-foreground: oklch(0.5 0.022 58);  /* warm taupe-brown        */
+  --accent: oklch(0.918 0.026 70);          /* hover wash              */
+  --accent-foreground: oklch(0.32 0.02 55);
+  --destructive: oklch(0.52 0.17 28);       /* muted brick             */
+  --border: oklch(0.872 0.02 72);
+  --input: oklch(0.882 0.018 72);
+  --ring: oklch(0.585 0.135 41);
+  --gold: oklch(0.74 0.1 76);               /* sparing flourish accent */
+
+  --chart-1: oklch(0.585 0.135 41);
+  --chart-2: oklch(0.74 0.1 76);
+  --chart-3: oklch(0.5 0.07 145);
+  --chart-4: oklch(0.55 0.09 250);
+  --chart-5: oklch(0.45 0.12 20);
+  --radius: 0.75rem;
+
+  --sidebar: oklch(0.945 0.018 80);
+  --sidebar-foreground: oklch(0.32 0.02 55);
+  --sidebar-primary: oklch(0.585 0.135 41);
+  --sidebar-primary-foreground: oklch(0.98 0.012 85);
+  --sidebar-accent: oklch(0.912 0.026 68);
+  --sidebar-accent-foreground: oklch(0.3 0.02 50);
+  --sidebar-border: oklch(0.875 0.02 72);
+  --sidebar-ring: oklch(0.585 0.135 41);
+}
+
+/* ── Nightdesk (dark): cream on warm espresso ───────────────────────────── */
+.dark {
+  --background: oklch(0.208 0.014 52);
+  --foreground: oklch(0.93 0.012 84);
+  --card: oklch(0.252 0.016 52);
+  --card-foreground: oklch(0.93 0.012 84);
+  --popover: oklch(0.252 0.016 52);
+  --popover-foreground: oklch(0.93 0.012 84);
+  --primary: oklch(0.665 0.14 43);          /* terracotta, lifted      */
+  --primary-foreground: oklch(0.2 0.012 52);
+  --secondary: oklch(0.305 0.016 52);
+  --secondary-foreground: oklch(0.9 0.012 82);
+  --muted: oklch(0.3 0.015 52);
+  --muted-foreground: oklch(0.74 0.014 76);
+  --accent: oklch(0.33 0.02 50);
+  --accent-foreground: oklch(0.93 0.012 84);
+  --destructive: oklch(0.62 0.16 28);
+  --border: oklch(0.9 0.012 82 / 12%);
+  --input: oklch(0.9 0.012 82 / 16%);
+  --ring: oklch(0.665 0.14 43);
+  --gold: oklch(0.8 0.1 78);
+
+  --chart-1: oklch(0.665 0.14 43);
+  --chart-2: oklch(0.8 0.1 78);
+  --chart-3: oklch(0.62 0.09 145);
+  --chart-4: oklch(0.62 0.1 250);
+  --chart-5: oklch(0.6 0.14 20);
+
+  --sidebar: oklch(0.185 0.013 52);
+  --sidebar-foreground: oklch(0.86 0.012 82);
+  --sidebar-primary: oklch(0.665 0.14 43);
+  --sidebar-primary-foreground: oklch(0.2 0.012 52);
+  --sidebar-accent: oklch(0.3 0.018 50);
+  --sidebar-accent-foreground: oklch(0.93 0.012 84);
+  --sidebar-border: oklch(0.9 0.012 82 / 10%);
+  --sidebar-ring: oklch(0.665 0.14 43);
 }
 
 body {
@@ -49,8 +97,13 @@ body {
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --font-heading: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', 'Menlo', monospace;
+
+  --color-gold: var(--gold);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -82,47 +135,20 @@ body {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-sm: calc(var(--radius) * 0.55);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-xl: calc(var(--radius) * 1.35);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-}
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --animate-message-in: message-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes message-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
 }
 
 @layer base {
@@ -130,9 +156,169 @@ body {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    position: relative;
+    min-height: 100vh;
   }
   html {
     @apply font-sans;
   }
+  h1, h2, h3 {
+    @apply font-display;
+    letter-spacing: -0.015em;
+    font-optical-sizing: auto;
+  }
+
+  /* Atmosphere: a faint warm grain over everything + a soft top-light vignette,
+     so the "paper" never reads as a flat fill. Non-interactive, fixed. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+  .dark body::before {
+    mix-blend-mode: screen;
+    opacity: 0.06;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 28%, transparent);
+    color: var(--foreground);
+  }
+
+  /* Warm, slim scrollbars that fade into the paper. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent) transparent;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 18%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--foreground) 32%, transparent);
+    background-clip: padding-box;
+  }
 }
+
+/* ── Streaming affordances ──────────────────────────────────────────────── */
+
+/* Ink caret that trails the streaming reply. */
+.stream-caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: -0.18em;
+  background: var(--primary);
+  border-radius: 1px;
+  animation: caret-blink 1.05s steps(1) infinite;
+}
+@keyframes caret-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* Three-dot "composing a reply" indicator. */
+.thinking-dots { display: inline-flex; gap: 4px; align-items: center; }
+.thinking-dots > span {
+  width: 6px; height: 6px; border-radius: 999px;
+  background: var(--muted-foreground);
+  animation: thinking 1.25s ease-in-out infinite;
+}
+.thinking-dots > span:nth-child(2) { animation-delay: 0.18s; }
+.thinking-dots > span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes thinking {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* ── Markdown prose (no typography plugin in this project) ───────────────── */
+.message-prose {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+.message-prose > :first-child { margin-top: 0; }
+.message-prose > :last-child { margin-bottom: 0; }
+.message-prose p { margin: 0.7em 0; }
+.message-prose h1, .message-prose h2, .message-prose h3, .message-prose h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  margin: 1.1em 0 0.45em;
+}
+.message-prose h1 { font-size: 1.5em; }
+.message-prose h2 { font-size: 1.3em; }
+.message-prose h3 { font-size: 1.12em; }
+.message-prose ul, .message-prose ol { margin: 0.7em 0; padding-left: 1.35em; }
+.message-prose li { margin: 0.3em 0; }
+.message-prose li::marker { color: var(--primary); }
+.message-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in oklch, var(--primary) 45%, transparent);
+}
+.message-prose a:hover { text-decoration-color: var(--primary); }
+.message-prose strong { font-weight: 600; color: var(--foreground); }
+.message-prose em { font-style: italic; }
+.message-prose blockquote {
+  margin: 0.9em 0;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 2px solid var(--primary);
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.message-prose hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.4em 0;
+}
+.message-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  padding: 0.12em 0.4em;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--primary) 12%, var(--card));
+  color: color-mix(in oklch, var(--primary) 70%, var(--foreground));
+}
+.message-prose pre {
+  margin: 0.9em 0;
+  padding: 0.95em 1.1em;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  background: oklch(0.24 0.014 52);
+  color: oklch(0.92 0.012 84);
+  border: 1px solid color-mix(in oklch, var(--foreground) 10%, transparent);
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+.message-prose pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.message-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.9em 0;
+  font-family: var(--font-sans);
+  font-size: 0.9em;
+}
+.message-prose th, .message-prose td {
+  border: 1px solid var(--border);
+  padding: 0.45em 0.7em;
+  text-align: left;
+}
+.message-prose th { background: var(--muted); font-weight: 600; }
