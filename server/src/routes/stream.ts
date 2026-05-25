@@ -13,6 +13,30 @@ const streamBodySchema = z.object({
   attachmentIds: z.array(z.string()).max(5).optional(),
 });
 
+/**
+ * Link the user's unlinked attachments to a message and return them as base64
+ * data URLs for the vision call. Ignores ids that aren't owned/unlinked.
+ */
+async function linkAttachmentsAsImages(
+  attachmentIds: string[],
+  userId: string,
+  messageId: string,
+): Promise<string[]> {
+  const atts = await prisma.attachment.findMany({
+    where: { id: { in: attachmentIds }, userId, messageId: null },
+  });
+  if (atts.length === 0) return [];
+
+  await prisma.attachment.updateMany({
+    where: { id: { in: atts.map((a) => a.id) } },
+    data: { messageId },
+  });
+
+  return atts
+    .filter((a) => fs.existsSync(a.storedPath))
+    .map((a) => `data:${a.mimeType};base64,${fs.readFileSync(a.storedPath).toString("base64")}`);
+}
+
 export function createStreamRouter(getAi: () => AiClient): Router {
   const router = Router();
 
@@ -68,21 +92,10 @@ export function createStreamRouter(getAi: () => AiClient): Router {
       });
 
       // 3b. Link any uploaded images to this message and load them as data URLs
-      let images: string[] = [];
-      if (attachmentIds && attachmentIds.length > 0) {
-        const atts = await prisma.attachment.findMany({
-          where: { id: { in: attachmentIds }, userId: req.userId!, messageId: null },
-        });
-        if (atts.length > 0) {
-          await prisma.attachment.updateMany({
-            where: { id: { in: atts.map((a) => a.id) } },
-            data: { messageId: userMessage.id },
-          });
-          images = atts
-            .filter((a) => fs.existsSync(a.storedPath))
-            .map((a) => `data:${a.mimeType};base64,${fs.readFileSync(a.storedPath).toString("base64")}`);
-        }
-      }
+      const images =
+        attachmentIds && attachmentIds.length > 0
+          ? await linkAttachmentsAsImages(attachmentIds, req.userId!, userMessage.id)
+          : [];
 
       ai = getAi();
 
