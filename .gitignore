@@ -5,3 +5,4 @@ dist/
 
 # uploaded files (image attachments)
 server/uploads/
+.gstack/

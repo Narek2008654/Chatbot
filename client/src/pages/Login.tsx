@@ -1,9 +1,17 @@
 import { SignIn } from "@clerk/clerk-react";
+import { AuthShell, useClerkAppearance } from "@/components/AuthShell";
 
 export function Login() {
+  const appearance = useClerkAppearance();
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <SignIn routing="path" path="/login" signUpUrl="/signup" forceRedirectUrl="/" />
-    </div>
+    <AuthShell title="Welcome back" subtitle="Sign in to pick up the conversation.">
+      <SignIn
+        routing="path"
+        path="/login"
+        signUpUrl="/signup"
+        forceRedirectUrl="/"
+        appearance={appearance}
+      />
+    </AuthShell>
   );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SendHorizonal, Paperclip, X, Mic } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { useDictation } from "@/lib/useDictation";
+import { cn } from "@/lib/utils";
 
 const MAX_IMAGES = 5;
 
@@ -24,6 +25,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [value, setValue] = useState("");
   const [pending, setPending] = useState<PendingImage[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dictation = useDictation({
@@ -78,6 +80,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    setDragging(false);
     if (disabled) return;
     if (e.dataTransfer.files.length > 0) void uploadFiles(Array.from(e.dataTransfer.files));
   }
@@ -85,79 +88,104 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const canSend = !disabled && !uploading && (value.trim().length > 0 || pending.length > 0);
 
   return (
-    <div
-      className="border-t p-3"
-      onDrop={handleDrop}
-      onDragOver={(e) => e.preventDefault()}
-    >
-      {pending.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2">
-          {pending.map((img) => (
-            <div key={img.id} className="relative">
-              <img
-                src={img.previewUrl}
-                alt={img.filename}
-                className="h-16 w-16 rounded-lg object-cover"
-              />
-              <button
-                type="button"
-                onClick={() => removePending(img.id)}
-                aria-label={`Remove ${img.filename}`}
-                className="absolute -right-1.5 -top-1.5 rounded-full bg-foreground text-background"
-              >
-                <X className="size-4 p-0.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="px-4 pb-5 pt-2 sm:px-6">
+      <div
+        onDrop={handleDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        className={cn(
+          "mx-auto max-w-3xl rounded-[20px] border bg-card p-2 shadow-md transition-colors",
+          dragging
+            ? "border-primary ring-2 ring-primary/30"
+            : "border-border focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15",
+        )}
+      >
+        {pending.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2 px-1 pt-1">
+            {pending.map((img) => (
+              <div key={img.id} className="relative">
+                <img
+                  src={img.previewUrl}
+                  alt={img.filename}
+                  className="h-16 w-16 rounded-xl object-cover ring-1 ring-black/5"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePending(img.id)}
+                  aria-label={`Remove ${img.filename}`}
+                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-foreground text-background shadow-sm transition-transform hover:scale-110"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-      <div className="flex items-end gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => {
-            if (e.target.files) void uploadFiles(Array.from(e.target.files));
-            e.target.value = "";
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={disabled || uploading || pending.length >= MAX_IMAGES}
-          aria-label="Attach image"
-        >
-          <Paperclip />
-        </Button>
-        {dictation.supported && (
+        <div className="flex items-end gap-1.5">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) void uploadFiles(Array.from(e.target.files));
+              e.target.value = "";
+            }}
+          />
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
-            disabled={disabled}
-            aria-label={dictation.listening ? "Stop dictation" : "Start dictation"}
-            className={dictation.listening ? "animate-pulse text-destructive" : undefined}
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || uploading || pending.length >= MAX_IMAGES}
+            aria-label="Attach image"
           >
-            <Mic />
+            <Paperclip />
           </Button>
-        )}
-        <Textarea
-          placeholder="Message…"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          className="resize-none"
-          rows={1}
-        />
-        <Button size="icon" onClick={handleSend} disabled={!canSend} aria-label="Send">
-          <SendHorizonal />
-        </Button>
+          {dictation.supported && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+              disabled={disabled}
+              aria-label={dictation.listening ? "Stop dictation" : "Start dictation"}
+              className={cn(
+                "text-muted-foreground hover:text-foreground",
+                dictation.listening && "animate-pulse text-destructive",
+              )}
+            >
+              <Mic />
+            </Button>
+          )}
+          <Textarea
+            placeholder="Message…"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            className="max-h-44 min-h-9 resize-none border-0 bg-transparent px-1 py-1.5 text-[0.95rem] shadow-none focus-visible:ring-0 dark:bg-transparent"
+            rows={1}
+          />
+          <Button
+            size="icon"
+            onClick={handleSend}
+            disabled={!canSend}
+            aria-label="Send"
+            className="shadow-sm transition-transform enabled:hover:scale-105"
+          >
+            <SendHorizonal />
+          </Button>
+        </div>
       </div>
+      <p className="mx-auto mt-2 max-w-3xl px-1 text-center text-xs text-muted-foreground/70">
+        Press <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
+        <kbd className="font-sans font-medium">Shift</kbd>+<kbd className="font-sans font-medium">Enter</kbd> for a new line
+      </p>
     </div>
   );
 }
