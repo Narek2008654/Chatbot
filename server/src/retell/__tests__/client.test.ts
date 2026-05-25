@@ -14,10 +14,8 @@ describe("createRetellClient", () => {
     const client = createRetellClient("sk_test");
     const out = await client.createVoiceAgent({
       name: "Support",
-      purpose: "help customers",
-      instructions: "be kind",
+      systemPrompt: "You are a hiring manager.\n\nGuardrails: handle silence, sensitive questions...",
       greeting: "Hi!",
-      endCondition: "user says bye",
       voiceId: "retell-Cimo",
     });
 
@@ -28,8 +26,8 @@ describe("createRetellClient", () => {
     expect((llmInit.headers as Record<string, string>).Authorization).toBe("Bearer sk_test");
     const llmBody = JSON.parse(llmInit.body as string);
     expect(llmBody.begin_message).toBe("Hi!");
-    expect(llmBody.general_prompt).toContain("be kind");
-    expect(llmBody.general_prompt).toContain("user says bye");
+    // The model-authored prompt is used verbatim as the general_prompt.
+    expect(llmBody.general_prompt).toBe("You are a hiring manager.\n\nGuardrails: handle silence, sensitive questions...");
 
     const [agentUrl, agentInit] = fetchMock.mock.calls[1];
     expect(String(agentUrl)).toContain("/create-agent");
@@ -46,7 +44,7 @@ describe("createRetellClient", () => {
     );
     await expect(
       createRetellClient("sk").createVoiceAgent({
-        name: "x", purpose: "x", instructions: "x", greeting: "x", endCondition: "x", voiceId: "nope",
+        name: "x", systemPrompt: "x", greeting: "x", voiceId: "nope",
       }),
     ).rejects.toThrow(/422/);
   });
@@ -54,7 +52,7 @@ describe("createRetellClient", () => {
   it("throws a clear error when no api key is configured", async () => {
     await expect(
       createRetellClient("").createVoiceAgent({
-        name: "x", purpose: "x", instructions: "x", greeting: "x", endCondition: "x", voiceId: "v",
+        name: "x", systemPrompt: "x", greeting: "x", voiceId: "v",
       }),
     ).rejects.toThrow(/api key/i);
   });
