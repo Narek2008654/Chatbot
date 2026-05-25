@@ -2,10 +2,9 @@ const RETELL_BASE = "https://api.retellai.com";
 
 export interface CreateVoiceAgentInput {
   name: string;
-  purpose: string;
-  instructions: string;
+  /** The complete, model-authored system prompt for the agent (used verbatim). */
+  systemPrompt: string;
   greeting: string;
-  endCondition: string;
   voiceId: string;
 }
 
@@ -30,12 +29,13 @@ export function createRetellClient(apiKey: string): RetellClient {
 
   return {
     async createVoiceAgent(input) {
-      const generalPrompt = `${input.purpose}\n\n${input.instructions}\n\nEnd the call when: ${input.endCondition}`;
       const llm = await post("/create-retell-llm", {
         model: "gpt-4.1",
-        general_prompt: generalPrompt,
+        general_prompt: input.systemPrompt,
         begin_message: input.greeting,
-        general_tools: [{ type: "end_call", name: "end_call", description: input.endCondition }],
+        general_tools: [
+          { type: "end_call", name: "end_call", description: "End the call when the conversation is complete per the system prompt." },
+        ],
       });
       const llmId = String(llm["llm_id"]);
 

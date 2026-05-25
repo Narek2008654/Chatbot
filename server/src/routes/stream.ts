@@ -13,26 +13,27 @@ import { extractFacts } from "../memory/extract.js";
 function createRetellAgentTool(retell: RetellClient): ToolDefinition {
   return {
     name: "create_retell_voice_agent",
-    description: "Create a voice agent on RetellAI. Only call once all details are gathered.",
+    description:
+      "Create a voice agent on RetellAI. Only call after you have drafted a complete agent_prompt and the user has approved it.",
     parameters: {
       type: "object",
       properties: {
-        name: { type: "string" },
-        purpose: { type: "string" },
-        instructions: { type: "string" },
-        greeting: { type: "string" },
-        end_condition: { type: "string" },
+        name: { type: "string", description: "Short name for the agent." },
+        agent_prompt: {
+          type: "string",
+          description:
+            "The complete system prompt for the voice agent: persona, goal, step-by-step call flow, and guardrails (silence/no-response, sensitive or compensation questions, objections, voicemail, scheduling, and exact end-call conditions).",
+        },
+        greeting: { type: "string", description: "The first line the agent speaks." },
         voice_id: { type: "string" },
       },
-      required: ["name", "purpose", "instructions", "greeting", "end_condition", "voice_id"],
+      required: ["name", "agent_prompt", "greeting", "voice_id"],
     },
     run: async (args) => {
       const { agentId } = await retell.createVoiceAgent({
         name: String(args.name),
-        purpose: String(args.purpose),
-        instructions: String(args.instructions),
+        systemPrompt: String(args.agent_prompt),
         greeting: String(args.greeting),
-        endCondition: String(args.end_condition),
         voiceId: String(args.voice_id),
       });
       return `Created Retell agent "${String(args.name)}" — agent_id ${agentId}.`;

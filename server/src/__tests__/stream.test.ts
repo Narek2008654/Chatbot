@@ -154,10 +154,8 @@ test("the create_retell_voice_agent tool runs and streams a confirmation", async
         if (input.tools && input.tools.length > 0) {
           yield await input.tools[0].run({
             name: "Support",
-            purpose: "help",
-            instructions: "be kind",
+            agent_prompt: "You are a hiring manager. Guardrails: handle silence, sensitive questions, objections...",
             greeting: "Hi",
-            end_condition: "user says bye",
             voice_id: "retell-Cimo",
           });
         } else {
@@ -179,11 +177,8 @@ test("the create_retell_voice_agent tool runs and streams a confirmation", async
 
   expect(res.text).toContain("Created Retell agent");
   expect(calls).toHaveLength(1);
-  expect(calls[0]).toMatchObject({
-    name: "Support",
-    voiceId: "retell-Cimo",
-    endCondition: "user says bye",
-  });
+  expect(calls[0]).toMatchObject({ name: "Support", voiceId: "retell-Cimo" });
+  expect(calls[0].systemPrompt).toContain("hiring manager");
 });
 
 test("POST /api/chats/:id/stream links attachments and forwards image data URLs to the AI", async () => {
