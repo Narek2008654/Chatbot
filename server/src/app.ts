@@ -6,16 +6,25 @@ import "./middleware/requireAuth.js";
 import { clerkAuth } from "./middleware/clerkAuth.js";
 import type { AiClient } from "./ai/client.js";
 import { createOpenAiClient } from "./ai/client.js";
+import type { RetellClient } from "./retell/client.js";
+import { createRetellClient } from "./retell/client.js";
 import { createChatsRouter } from "./routes/chats.js";
 import { createMemoryRouter } from "./routes/memory.js";
 import { createUploadsRouter } from "./routes/uploads.js";
 import { createFilesRouter } from "./routes/files.js";
 
-export function createApp(opts: { ai?: AiClient; requireAuth?: RequestHandler } = {}) {
-  let cachedReal: AiClient | undefined;
+export function createApp(
+  opts: { ai?: AiClient; retell?: RetellClient; requireAuth?: RequestHandler } = {},
+) {
+  let cachedAi: AiClient | undefined;
+  let cachedRetell: RetellClient | undefined;
 
   function getAi(): AiClient {
-    return opts.ai ?? (cachedReal ??= createOpenAiClient(env.OPENAI_API_KEY ?? ""));
+    return opts.ai ?? (cachedAi ??= createOpenAiClient(env.OPENAI_API_KEY ?? ""));
+  }
+
+  function getRetell(): RetellClient {
+    return opts.retell ?? (cachedRetell ??= createRetellClient(env.RETELL_API_KEY ?? ""));
   }
 
   const app = express();
@@ -36,7 +45,7 @@ export function createApp(opts: { ai?: AiClient; requireAuth?: RequestHandler } 
 
   app.use(express.json());
 
-  app.use("/api/chats", guard, createChatsRouter(getAi));
+  app.use("/api/chats", guard, createChatsRouter(getAi, getRetell));
   app.use("/api/memory", guard, createMemoryRouter());
   app.use("/api/uploads", guard, createUploadsRouter());
   app.use("/api/files", guard, createFilesRouter());
