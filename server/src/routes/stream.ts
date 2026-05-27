@@ -2,44 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import fs from "node:fs";
 import { prisma } from "../db.js";
-import type { AiClient, ChatMessage, ToolDefinition } from "../ai/client.js";
-import type { RetellClient } from "../retell/client.js";
+import type { AiClient, ChatMessage } from "../ai/client.js";
 import { searchMemories, addMemory } from "../memory/store.js";
 import { buildPrompt } from "../chat/prompt.js";
 import { generateChatTitle } from "../chat/title.js";
 import { extractFacts } from "../memory/extract.js";
-
-/** The tool the model calls (after interviewing the user) to create a Retell voice agent. */
-function createRetellAgentTool(retell: RetellClient): ToolDefinition {
-  return {
-    name: "create_retell_voice_agent",
-    description:
-      "Create a voice agent on RetellAI. Only call after you have drafted a complete agent_prompt and the user has approved it.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Short name for the agent." },
-        agent_prompt: {
-          type: "string",
-          description:
-            "The complete system prompt for the voice agent: persona, goal, step-by-step call flow, and guardrails (silence/no-response, sensitive or compensation questions, objections, voicemail, scheduling, and exact end-call conditions).",
-        },
-        greeting: { type: "string", description: "The first line the agent speaks." },
-        voice_id: { type: "string" },
-      },
-      required: ["name", "agent_prompt", "greeting", "voice_id"],
-    },
-    run: async (args) => {
-      const { agentId } = await retell.createVoiceAgent({
-        name: String(args.name),
-        systemPrompt: String(args.agent_prompt),
-        greeting: String(args.greeting),
-        voiceId: String(args.voice_id),
-      });
-      return `Created Retell agent "${String(args.name)}" — agent_id ${agentId}.`;
-    },
-  };
-}
 
 const streamBodySchema = z.object({
   content: z.string().min(1),
@@ -70,10 +37,7 @@ async function linkAttachmentsAsImages(
     .map((a) => `data:${a.mimeType};base64,${fs.readFileSync(a.storedPath).toString("base64")}`);
 }
 
-export function createStreamRouter(
-  getAi: () => AiClient,
-  getRetell: () => RetellClient,
-): Router {
+export function createStreamRouter(getAi: () => AiClient): Router {
   const router = Router();
 
   // POST /:id/stream — SSE streaming turn.
@@ -165,21 +129,15 @@ export function createStreamRouter(
       ? generateChatTitle(ai, content).catch(() => null)
       : null;
 
-    let full = "";
-
-    const tools = [createRetellAgentTool(getRetell())];
-
     try {
-      for await (const chunk of ai.streamChat({ system, messages, tools })) {
-        if (aborted) break;
-        full += chunk;
-        res.write("data: " + JSON.stringify({ text: chunk }) + "\n\n");
-      }
+      const full = await ai.chat({ system, messages });
 
       // If the client went away, stop without writing to a dead socket.
       if (aborted) return;
 
-      // 7. Save assistant message AFTER stream ends
+      res.write("data: " + JSON.stringify({ text: full }) + "\n\n");
+
+      // 7. Save assistant message
       await prisma.message.create({
         data: { chatId, role: "assistant", content: full },
       });

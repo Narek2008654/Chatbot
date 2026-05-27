@@ -3,7 +3,6 @@ import request from "supertest";
 import { createApp } from "../app.js";
 import { prisma } from "../db.js";
 import { createFakeAi } from "../ai/fakeAi.js";
-import { createFakeRetellClient, type CreateVoiceAgentInput } from "../retell/client.js";
 import { fakeAuth } from "../test/fakeAuth.js";
 
 const app = createApp({ ai: createFakeAi(), requireAuth: fakeAuth });
@@ -144,52 +143,14 @@ test("POST /api/chats/:id/stream returns 404 when another user streams to user1'
   expect(res.body).toEqual({ error: "not found" });
 });
 
-test("the create_retell_voice_agent tool runs and streams a confirmation", async () => {
-  const calls: CreateVoiceAgentInput[] = [];
-  const toolApp = createApp({
-    requireAuth: fakeAuth,
-    retell: createFakeRetellClient({ calls }),
-    ai: createFakeAi({
-      streamChat: async function* (input) {
-        if (input.tools && input.tools.length > 0) {
-          yield await input.tools[0].run({
-            name: "Support",
-            agent_prompt: "You are a hiring manager. Guardrails: handle silence, sensitive questions, objections...",
-            greeting: "Hi",
-            voice_id: "retell-Cimo",
-          });
-        } else {
-          yield "Hello from the fake AI.";
-        }
-      },
-    }),
-  });
-
-  const chatRes = await request(toolApp)
-    .post("/api/chats")
-    .set("x-test-user-id", USER1)
-    .send({ title: "Agent" });
-
-  const res = await request(toolApp)
-    .post(`/api/chats/${chatRes.body.id}/stream`)
-    .set("x-test-user-id", USER1)
-    .send({ content: "create an agent" });
-
-  expect(res.text).toContain("Created Retell agent");
-  expect(calls).toHaveLength(1);
-  expect(calls[0]).toMatchObject({ name: "Support", voiceId: "retell-Cimo" });
-  expect(calls[0].systemPrompt).toContain("hiring manager");
-});
-
 test("POST /api/chats/:id/stream links attachments and forwards image data URLs to the AI", async () => {
-  // A fake AI that records the streamChat input it receives.
+  // A fake AI that records the chat input it receives.
   let captured: { system: string; messages: import("../ai/client.js").ChatMessage[] } | null = null;
   const capturingApp = createApp({
     ai: createFakeAi({
-      // eslint-disable-next-line require-yield
-      streamChat: async function* (input) {
+      chat: async (input) => {
         captured = input;
-        return; // no chunks needed for this assertion
+        return "";
       },
     }),
     requireAuth: fakeAuth,

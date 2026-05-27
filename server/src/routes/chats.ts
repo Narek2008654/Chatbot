@@ -2,7 +2,6 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AiClient } from "../ai/client.js";
-import type { RetellClient } from "../retell/client.js";
 import { createStreamRouter } from "./stream.js";
 
 const createChatSchema = z.object({
@@ -18,7 +17,7 @@ const chatSelect = {
   updatedAt: true,
 } as const;
 
-export function createChatsRouter(getAi: () => AiClient, getRetell: () => RetellClient): Router {
+export function createChatsRouter(getAi: () => AiClient): Router {
   const router = Router();
 
   // POST / — create a chat
@@ -111,7 +110,7 @@ export function createChatsRouter(getAi: () => AiClient, getRetell: () => Retell
   });
 
   // Mount the stream router — POST /:id/stream
-  router.use(createStreamRouter(getAi, getRetell));
+  router.use(createStreamRouter(getAi));
 
   return router;
 }

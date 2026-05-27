@@ -22,14 +22,10 @@ describe("createFakeAi", () => {
     expect(v1).not.toEqual(v2);
   });
 
-  it("streamChat yields at least one chunk and concatenation is a non-empty string", async () => {
+  it("chat returns a non-empty string", async () => {
     const ai = createFakeAi();
-    const chunks: string[] = [];
-    for await (const chunk of ai.streamChat({ system: "sys", messages: [] })) {
-      chunks.push(chunk);
-    }
-    expect(chunks.length).toBeGreaterThanOrEqual(1);
-    expect(chunks.join("")).not.toBe("");
+    const text = await ai.chat({ system: "sys", messages: [] });
+    expect(text).not.toBe("");
   });
 
   it("complete returns a string (default: '[]')", async () => {

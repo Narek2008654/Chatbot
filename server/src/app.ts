@@ -20,7 +20,7 @@ export function createApp(
   let cachedRetell: RetellClient | undefined;
 
   function getAi(): AiClient {
-    return opts.ai ?? (cachedAi ??= createOpenAiClient(env.OPENAI_API_KEY ?? ""));
+    return opts.ai ?? (cachedAi ??= createOpenAiClient(env.OPENAI_API_KEY ?? "", getRetell()));
   }
 
   function getRetell(): RetellClient {
@@ -45,7 +45,7 @@ export function createApp(
 
   app.use(express.json());
 
-  app.use("/api/chats", guard, createChatsRouter(getAi, getRetell));
+  app.use("/api/chats", guard, createChatsRouter(getAi));
   app.use("/api/memory", guard, createMemoryRouter());
   app.use("/api/uploads", guard, createUploadsRouter());
   app.use("/api/files", guard, createFilesRouter());

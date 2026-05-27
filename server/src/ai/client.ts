@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { env } from "../env.js";
+import type { RetellClient } from "../retell/client.js";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -37,24 +38,152 @@ export function toOpenAiMessages(system: string, messages: ChatMessage[]): OpenA
   return out;
 }
 
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>; // JSON Schema for the arguments
-  run: (args: Record<string, unknown>) => Promise<string>;
-}
-
 export interface AiClient {
   embed(text: string): Promise<number[]>;
-  streamChat(input: {
-    system: string;
-    messages: ChatMessage[];
-    tools?: ToolDefinition[];
-  }): AsyncIterable<string>;
+  chat(input: { system: string; messages: ChatMessage[] }): Promise<string>;
   complete(prompt: string): Promise<string>;
 }
 
-export function createOpenAiClient(apiKey: string): AiClient {
+/** Tool: create a new voice agent on RetellAI. */
+const CREATE_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "create_retell_voice_agent",
+    description:
+      "Create a voice agent on RetellAI. Only call after you have drafted a complete agent_prompt and the user has approved it.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Short name for the agent." },
+        agent_prompt: {
+          type: "string",
+          description:
+            "The complete system prompt for the voice agent: persona, goal, step-by-step call flow, and guardrails (silence/no-response, sensitive or compensation questions, objections, voicemail, scheduling, and exact end-call conditions).",
+        },
+        greeting: { type: "string", description: "The first line the agent speaks." },
+        voice_id: { type: "string" },
+      },
+      required: ["name", "agent_prompt", "greeting", "voice_id"],
+    },
+  },
+};
+
+/** Tool: place an outbound phone call with an existing agent. */
+const PLACE_CALL_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "place_phone_call",
+    description:
+      "Place an outbound phone call: have a Retell agent call a phone number. Only call when the user explicitly asks to call/dial someone and has provided the destination number.",
+    parameters: {
+      type: "object",
+      properties: {
+        from_number: {
+          type: "string",
+          description:
+            "The Retell-registered number to call FROM, in E.164 format. Omit to use the server's configured default number.",
+        },
+        to_number: {
+          type: "string",
+          description: "The number to call, in E.164 format (e.g. +37491452889).",
+        },
+        agent_id: {
+          type: "string",
+          description:
+            "Optional id of the agent that should handle the call. Omit to use the agent already assigned to from_number.",
+        },
+      },
+      required: ["to_number"],
+    },
+  },
+};
+
+/** Tool: hang up an ongoing phone call. */
+const END_CALL_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "end_phone_call",
+    description:
+      "Hang up an ongoing phone call. Use when the user asks to end, stop, or disconnect a call.",
+    parameters: {
+      type: "object",
+      properties: {
+        call_id: {
+          type: "string",
+          description:
+            "The id of the call to end (from place_phone_call). Omit to end the most recent ongoing call.",
+        },
+      },
+      required: [],
+    },
+  },
+};
+
+/** Tool: list the account's agents so the user can pick one. */
+const LIST_AGENTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "list_agents",
+    description:
+      "List the voice agents on this RetellAI account (name + id). Use it to let the user choose which agent should place a call.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+};
+
+/** All tools available to the model. */
+const TOOLS = [CREATE_AGENT_TOOL, PLACE_CALL_TOOL, END_CALL_TOOL, LIST_AGENTS_TOOL];
+
+/** A single tool call the model asked for, as returned on a chat message. */
+type ToolCall = NonNullable<OpenAI.Chat.Completions.ChatCompletionMessage["tool_calls"]>[number];
+
+/**
+ * Run a tool call the model requested and return its result as text.
+ * Never throws: an unknown tool or a failure becomes text the model can read
+ * and explain to the user (e.g. "I couldn't create the agent…").
+ */
+export async function runToolCall(retell: RetellClient, call: ToolCall): Promise<string> {
+  try {
+    const args = JSON.parse(call.function.arguments || "{}");
+    switch (call.function.name) {
+      case "create_retell_voice_agent": {
+        const { agentId } = await retell.createVoiceAgent({
+          name: String(args.name),
+          systemPrompt: String(args.agent_prompt),
+          greeting: String(args.greeting),
+          voiceId: String(args.voice_id),
+        });
+        return `Created Retell agent "${String(args.name)}" — agent_id ${agentId}.`;
+      }
+      case "place_phone_call": {
+        const { callId } = await retell.createPhoneCall({
+          fromNumber: String(args.from_number ?? env.RETELL_FROM_NUMBER ?? ""),
+          toNumber: String(args.to_number),
+          agentId: args.agent_id ? String(args.agent_id) : undefined,
+        });
+        return `Started outbound call to ${String(args.to_number)} — call_id ${callId}.`;
+      }
+      case "end_phone_call": {
+        if (args.call_id) {
+          await retell.stopCall(String(args.call_id));
+          return `Ended call ${String(args.call_id)}.`;
+        }
+        const callId = await retell.stopLatestOngoingCall();
+        return `Ended the most recent ongoing call (${callId}).`;
+      }
+      case "list_agents": {
+        const agents = await retell.listAgents();
+        if (agents.length === 0) return "No agents found on this account.";
+        return "Available agents:\n" + agents.map((a) => `- ${a.name} (${a.agentId})`).join("\n");
+      }
+      default:
+        return `Unknown tool: ${call.function.name}`;
+    }
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+export function createOpenAiClient(apiKey: string, retell: RetellClient): AiClient {
   const openai = new OpenAI({ apiKey });
 
   return {
@@ -66,72 +195,40 @@ export function createOpenAiClient(apiKey: string): AiClient {
       return res.data[0].embedding;
     },
 
-    async *streamChat({
+    async chat({
       system,
       messages,
-      tools,
     }: {
       system: string;
       messages: ChatMessage[];
-      tools?: ToolDefinition[];
-    }): AsyncGenerator<string> {
-      const oaTools = tools?.map((t) => ({
-        type: "function" as const,
-        function: { name: t.name, description: t.description, parameters: t.parameters },
-      }));
+    }): Promise<string> {
       const convo = toOpenAiMessages(system, messages) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
 
-      // Loop so the model can call tools and then produce a final answer.
-      // Capped to avoid runaway tool loops.
-      for (let iteration = 0; iteration < 3; iteration++) {
-        const stream = await openai.chat.completions.create({
+      // The model may chain tools (e.g. list_agents → place_phone_call) before
+      // answering, so loop: run any requested tools and ask again until it
+      // returns plain text. Bounded to avoid runaway tool loops.
+      for (let round = 0; round < 5; round++) {
+        const res = await openai.chat.completions.create({
           model: env.CHAT_MODEL,
           messages: convo,
-          tools: oaTools,
-          stream: true,
+          tools: TOOLS,
         });
+        const message = res.choices[0].message;
 
-        const toolCalls: Record<number, { id: string; name: string; args: string }> = {};
-        let assistantText = "";
-        for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta;
-          if (delta?.content) {
-            assistantText += delta.content;
-            yield delta.content;
-          }
-          for (const tc of delta?.tool_calls ?? []) {
-            const call = (toolCalls[tc.index] ??= { id: "", name: "", args: "" });
-            if (tc.id) call.id = tc.id;
-            if (tc.function?.name) call.name += tc.function.name;
-            if (tc.function?.arguments) call.args += tc.function.arguments;
-          }
+        // No tool calls → the model answered directly.
+        if (!message.tool_calls || message.tool_calls.length === 0) {
+          return message.content ?? "";
         }
 
-        const calls = Object.values(toolCalls);
-        if (calls.length === 0) return; // plain answer; already streamed
-
-        convo.push({
-          role: "assistant",
-          content: assistantText || null,
-          tool_calls: calls.map((c) => ({
-            id: c.id,
-            type: "function",
-            function: { name: c.name, arguments: c.args },
-          })),
-        });
-
-        for (const c of calls) {
-          const tool = tools?.find((t) => t.name === c.name);
-          let result: string;
-          try {
-            result = tool ? await tool.run(JSON.parse(c.args || "{}")) : `Unknown tool: ${c.name}`;
-          } catch (err) {
-            result = `Error: ${err instanceof Error ? err.message : String(err)}`;
-          }
-          convo.push({ role: "tool", tool_call_id: c.id, content: result });
+        convo.push(message);
+        for (const call of message.tool_calls) {
+          const result = await runToolCall(retell, call);
+          convo.push({ role: "tool", tool_call_id: call.id, content: result });
         }
-        // Next iteration streams the follow-up (user-facing) reply.
       }
+
+      // Tool loop exhausted without producing a plain answer.
+      return "";
     },
 
     async complete(prompt: string): Promise<string> {

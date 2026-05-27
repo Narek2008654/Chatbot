@@ -10,6 +10,8 @@ const envSchema = z.object({
   CHAT_MODEL: z.string().default("gpt-4o-mini"),
   EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
   RETELL_API_KEY: z.string().optional(),
+  // Default Retell-registered number to place outbound calls from (E.164, e.g. +12182070114).
+  RETELL_FROM_NUMBER: z.string().optional(),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.string().default("development"),
 });

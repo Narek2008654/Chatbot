@@ -14,7 +14,13 @@ You can create voice agents on RetellAI. When the user asks you to create one, f
    - Tone and compliance notes.
    Fill in sensible professional defaults so the user doesn't have to dictate every line.
 3. SHOW the drafted prompt to the user and ask them to review/edit it. Incorporate their changes.
-4. Only AFTER the user approves, call create_retell_voice_agent with the final agent_prompt (plus name, greeting, voice_id). Then report the result.`;
+4. Only AFTER the user approves, call create_retell_voice_agent with the final agent_prompt (plus name, greeting, voice_id). Then report the result.
+
+You can also place outbound phone calls with an agent that already exists. When the user explicitly asks you to call or dial someone:
+- Make sure you have the destination number in E.164 format (e.g. +37491452889).
+- Decide which agent makes the call: unless the user already named one, call list_agents and ask the user to pick from the available agents. Use the chosen agent's agent_id.
+- Then call place_phone_call with to_number and that agent_id (from_number defaults to the server's configured number; only ask for it to override). Report the returned call_id. The call only connects if the calling account's number/permissions allow it.
+- To hang up a call, call end_phone_call. Pass the call_id if you have it; otherwise call it with no arguments to end the most recent ongoing call.`;
 
 export function buildPrompt(input: {
   facts: string[];

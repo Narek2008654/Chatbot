@@ -1,18 +1,111 @@
-import { describe, it, expect, vi } from "vitest";
-import type { ToolDefinition } from "../client.js";
+import { describe, it, expect } from "vitest";
+import { runToolCall } from "../client.js";
+import {
+  createFakeRetellClient,
+  type CreateVoiceAgentInput,
+  type CreatePhoneCallInput,
+} from "../../retell/client.js";
 
-describe("ToolDefinition", () => {
-  it("runs its handler and returns a string result", async () => {
-    const run = vi.fn(async (args: Record<string, unknown>) => `ran with ${args.x}`);
-    const tool: ToolDefinition = {
-      name: "t",
-      description: "d",
-      parameters: { type: "object", properties: { x: { type: "number" } } },
-      run,
-    };
+// Build a synthetic OpenAI tool call (what the model would emit).
+function toolCall(name: string, args: Record<string, unknown>) {
+  return {
+    id: "call_1",
+    type: "function" as const,
+    function: { name, arguments: JSON.stringify(args) },
+  };
+}
 
-    const result = await tool.run({ x: 1 });
-    expect(result).toBe("ran with 1");
-    expect(run).toHaveBeenCalledWith({ x: 1 });
+describe("runToolCall", () => {
+  it("creates a Retell voice agent and returns a confirmation", async () => {
+    const calls: CreateVoiceAgentInput[] = [];
+    const retell = createFakeRetellClient({ calls });
+
+    const result = await runToolCall(
+      retell,
+      toolCall("create_retell_voice_agent", {
+        name: "Support",
+        agent_prompt: "You are a hiring manager. Guardrails: handle silence, sensitive questions...",
+        greeting: "Hi",
+        voice_id: "retell-Cimo",
+      }),
+    );
+
+    expect(result).toContain("Created Retell agent");
+    expect(result).toContain("agent_fake");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ name: "Support", voiceId: "retell-Cimo" });
+    expect(calls[0].systemPrompt).toContain("hiring manager");
+  });
+
+  it("places an outbound phone call and returns a confirmation", async () => {
+    const phoneCalls: CreatePhoneCallInput[] = [];
+    const retell = createFakeRetellClient({ phoneCalls });
+
+    const result = await runToolCall(
+      retell,
+      toolCall("place_phone_call", {
+        from_number: "+12182070114",
+        to_number: "+37491452889",
+        agent_id: "agent_x",
+      }),
+    );
+
+    expect(result).toContain("Started outbound call to +37491452889");
+    expect(result).toContain("call_fake");
+    expect(phoneCalls).toHaveLength(1);
+    expect(phoneCalls[0]).toMatchObject({
+      fromNumber: "+12182070114",
+      toNumber: "+37491452889",
+      agentId: "agent_x",
+    });
+  });
+
+  it("ends an ongoing call and returns a confirmation", async () => {
+    const stoppedCallIds: string[] = [];
+    const retell = createFakeRetellClient({ stoppedCallIds });
+
+    const result = await runToolCall(retell, toolCall("end_phone_call", { call_id: "call_123" }));
+
+    expect(result).toContain("Ended call call_123");
+    expect(stoppedCallIds).toEqual(["call_123"]);
+  });
+
+  it("ends the most recent ongoing call when no call_id is given", async () => {
+    const stoppedCallIds: string[] = [];
+    const retell = createFakeRetellClient({ stoppedCallIds });
+
+    const result = await runToolCall(retell, toolCall("end_phone_call", {}));
+
+    expect(result).toContain("most recent ongoing call");
+    expect(stoppedCallIds).toEqual(["call_fake"]);
+  });
+
+  it("lists agents for the user to choose from", async () => {
+    const retell = createFakeRetellClient({
+      agents: [
+        { agentId: "agent_1", name: "Valod" },
+        { agentId: "agent_2", name: "Sales" },
+      ],
+    });
+
+    const result = await runToolCall(retell, toolCall("list_agents", {}));
+
+    expect(result).toContain("Valod (agent_1)");
+    expect(result).toContain("Sales (agent_2)");
+  });
+
+  it("returns an 'Unknown tool' message for an unrecognized tool name", async () => {
+    const result = await runToolCall(createFakeRetellClient(), toolCall("nope", {}));
+    expect(result).toMatch(/Unknown tool/);
+  });
+
+  it("returns an error message (does not throw) when the Retell call fails", async () => {
+    const retell = createFakeRetellClient({
+      createVoiceAgent: async () => {
+        throw new Error("bad voice");
+      },
+    });
+    const result = await runToolCall(retell, toolCall("create_retell_voice_agent", {}));
+    expect(result).toMatch(/Error: bad voice/);
   });
 });
