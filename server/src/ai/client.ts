@@ -38,9 +38,22 @@ export function toOpenAiMessages(system: string, messages: ChatMessage[]): OpenA
   return out;
 }
 
+/** What we know about a person we're calling. */
+export interface CallerInfo {
+  name: string | null;
+  background: string;
+  summary: string;
+}
+
 export interface AiClient {
   embed(text: string): Promise<number[]>;
-  chat(input: { system: string; messages: ChatMessage[]; chatId?: string }): Promise<string>;
+  chat(input: {
+    system: string;
+    messages: ChatMessage[];
+    chatId?: string;
+    /** Looks up what we know about a person by email (DB-backed, supplied by the route). */
+    lookupPerson?: (email: string) => Promise<CallerInfo | null>;
+  }): Promise<string>;
   complete(prompt: string): Promise<string>;
 }
 
@@ -95,7 +108,30 @@ const PLACE_CALL_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         person_email: {
           type: "string",
           description:
-            "Email of the person being called, used to track their engagement history. Ask the user for it before dialing.",
+            "Email of the person being called — used to track engagement and look them up. Ask the user for it before dialing.",
+        },
+        caller_name: {
+          type: "string",
+          description: "The person's name (from lookup_person, or ask the user on a first interaction).",
+        },
+        caller_background: {
+          type: "string",
+          description:
+            "What the user told you about this person on a first interaction (only needed the first time; it gets saved).",
+        },
+        caller_context: {
+          type: "string",
+          description:
+            "What the agent should know about this person going in (their background plus engagement summary). Fills {{caller_context}}.",
+        },
+        position: {
+          type: "string",
+          description: "For interviews: the role/position this call is about. Fills {{position}}.",
+        },
+        position_details: {
+          type: "string",
+          description:
+            "For interviews: the job details (responsibilities, requirements). Fills {{position_details}}.",
         },
       },
       required: ["to_number"],
@@ -135,8 +171,23 @@ const LIST_AGENTS_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   },
 };
 
+/** Tool: look up what we already know about a person by email. */
+const LOOKUP_PERSON_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "lookup_person",
+    description:
+      "Look up a person by email to see if we've spoken before. Returns their name, background, and engagement summary, or says it's a first interaction. Call this before placing an interview/engagement call.",
+    parameters: {
+      type: "object",
+      properties: { email: { type: "string", description: "The person's email." } },
+      required: ["email"],
+    },
+  },
+};
+
 /** All tools available to the model. */
-const TOOLS = [CREATE_AGENT_TOOL, PLACE_CALL_TOOL, END_CALL_TOOL, LIST_AGENTS_TOOL];
+const TOOLS = [CREATE_AGENT_TOOL, PLACE_CALL_TOOL, END_CALL_TOOL, LIST_AGENTS_TOOL, LOOKUP_PERSON_TOOL];
 
 /** A single tool call the model asked for, as returned on a chat message. */
 type ToolCall = NonNullable<OpenAI.Chat.Completions.ChatCompletionMessage["tool_calls"]>[number];
@@ -146,11 +197,15 @@ type ToolCall = NonNullable<OpenAI.Chat.Completions.ChatCompletionMessage["tool_
  * Never throws: an unknown tool or a failure becomes text the model can read
  * and explain to the user (e.g. "I couldn't create the agent…").
  */
-export async function runToolCall(
-  retell: RetellClient,
-  call: ToolCall,
-  chatId?: string,
-): Promise<string> {
+/** Dependencies tool execution needs, supplied per request by the route. */
+export interface ToolDeps {
+  retell: RetellClient;
+  chatId?: string;
+  lookupPerson?: (email: string) => Promise<CallerInfo | null>;
+}
+
+export async function runToolCall(deps: ToolDeps, call: ToolCall): Promise<string> {
+  const { retell } = deps;
   try {
     const args = JSON.parse(call.function.arguments || "{}");
     switch (call.function.name) {
@@ -165,13 +220,23 @@ export async function runToolCall(
       }
       case "place_phone_call": {
         const metadata: Record<string, unknown> = {};
-        if (chatId) metadata.chatId = chatId;
+        if (deps.chatId) metadata.chatId = deps.chatId;
         if (args.person_email) metadata.email = String(args.person_email);
+        if (args.caller_name) metadata.name = String(args.caller_name);
+        if (args.caller_background) metadata.background = String(args.caller_background);
+
+        // Values that fill {{placeholders}} in the agent's prompt for this call.
+        const vars: Record<string, string> = {};
+        for (const key of ["position", "position_details", "caller_name", "caller_context"] as const) {
+          if (args[key]) vars[key] = String(args[key]);
+        }
+
         const { callId } = await retell.createPhoneCall({
           fromNumber: String(args.from_number ?? env.RETELL_FROM_NUMBER ?? ""),
           toNumber: String(args.to_number),
           agentId: args.agent_id ? String(args.agent_id) : undefined,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+          dynamicVariables: Object.keys(vars).length > 0 ? vars : undefined,
         });
         return `Started outbound call to ${String(args.to_number)} — call_id ${callId}.`;
       }
@@ -187,6 +252,15 @@ export async function runToolCall(
         const agents = await retell.listAgents();
         if (agents.length === 0) return "No agents found on this account.";
         return "Available agents:\n" + agents.map((a) => `- ${a.name} (${a.agentId})`).join("\n");
+      }
+      case "lookup_person": {
+        const email = String(args.email ?? "").trim().toLowerCase();
+        if (!email || !deps.lookupPerson) return "No record found.";
+        const info = await deps.lookupPerson(email);
+        if (!info) {
+          return `First interaction with ${email} — no record yet. Ask the user for the person's name and any background about them.`;
+        }
+        return `Known contact ${email}: name=${info.name ?? "unknown"}; background=${info.background || "none"}; engagement summary=${info.summary || "none"}.`;
       }
       default:
         return `Unknown tool: ${call.function.name}`;
@@ -212,14 +286,17 @@ export function createOpenAiClient(apiKey: string, retell: RetellClient): AiClie
       system,
       messages,
       chatId,
+      lookupPerson,
     }: {
       system: string;
       messages: ChatMessage[];
       chatId?: string;
+      lookupPerson?: (email: string) => Promise<CallerInfo | null>;
     }): Promise<string> {
       const convo = toOpenAiMessages(system, messages) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+      const deps: ToolDeps = { retell, chatId, lookupPerson };
 
-      // The model may chain tools (e.g. list_agents → place_phone_call) before
+      // The model may chain tools (e.g. lookup_person → place_phone_call) before
       // answering, so loop: run any requested tools and ask again until it
       // returns plain text. Bounded to avoid runaway tool loops.
       for (let round = 0; round < 5; round++) {
@@ -237,7 +314,7 @@ export function createOpenAiClient(apiKey: string, retell: RetellClient): AiClie
 
         convo.push(message);
         for (const call of message.tool_calls) {
-          const result = await runToolCall(retell, call, chatId);
+          const result = await runToolCall(deps, call);
           convo.push({ role: "tool", tool_call_id: call.id, content: result });
         }
       }

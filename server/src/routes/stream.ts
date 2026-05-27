@@ -130,7 +130,17 @@ export function createStreamRouter(getAi: () => AiClient): Router {
       : null;
 
     try {
-      const full = await ai.chat({ system, messages, chatId });
+      const full = await ai.chat({
+        system,
+        messages,
+        chatId,
+        lookupPerson: async (email) => {
+          const p = await prisma.person.findUnique({
+            where: { userId_email: { userId: req.userId!, email: email.trim().toLowerCase() } },
+          });
+          return p ? { name: p.name, background: p.background, summary: p.summary } : null;
+        },
+      });
 
       // If the client went away, stop without writing to a dead socket.
       if (aborted) return;

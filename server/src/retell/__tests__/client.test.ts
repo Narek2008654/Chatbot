@@ -62,6 +62,25 @@ describe("createRetellClient", () => {
     });
   });
 
+  it("sends dynamic variables as retell_llm_dynamic_variables", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ call_id: "call_3" }) } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createRetellClient("sk_test").createPhoneCall({
+      fromNumber: "+12182070114",
+      toNumber: "+37491452889",
+      dynamicVariables: { position: "Backend Engineer", caller_name: "Colleen" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.retell_llm_dynamic_variables).toEqual({
+      position: "Backend Engineer",
+      caller_name: "Colleen",
+    });
+  });
+
   it("omits override_agent_id when no agent is given", async () => {
     const fetchMock = vi
       .fn()

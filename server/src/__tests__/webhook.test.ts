@@ -109,6 +109,28 @@ test("logs the full call and rolls it into the person identified by email", asyn
   expect(call?.personId).toBe(person?.id);
 });
 
+test("captures the person's name and background on first interaction", async () => {
+  const chatId = await createChat();
+  const email = "newperson@example.com";
+
+  await request(app)
+    .post("/api/retell/webhook")
+    .send({
+      event: "call_ended",
+      call: {
+        call_id: "call_named_1",
+        start_timestamp: 0,
+        end_timestamp: 20_000,
+        transcript: "Agent: Hi.\nUser: Hello.",
+        metadata: { chatId, email, name: "Jane Doe", background: "Referred by a colleague" },
+      },
+    });
+
+  const person = await prisma.person.findUnique({ where: { userId_email: { userId: USER, email } } });
+  expect(person?.name).toBe("Jane Doe");
+  expect(person?.background).toBe("Referred by a colleague");
+});
+
 test("is idempotent — a repeated call_id does not double-log", async () => {
   const chatId = await createChat();
   const body = {

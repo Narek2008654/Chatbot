@@ -41,10 +41,14 @@ async function rollUpPerson(
   userId: string,
   email: string,
   callSummary: string,
+  name: string | null,
+  background: string,
 ): Promise<string> {
   const existing = await prisma.person.findUnique({ where: { userId_email: { userId, email } } });
   if (!existing) {
-    const created = await prisma.person.create({ data: { userId, email, summary: callSummary } });
+    const created = await prisma.person.create({
+      data: { userId, email, summary: callSummary, name, background },
+    });
     return created.id;
   }
 
@@ -52,7 +56,15 @@ async function rollUpPerson(
     "Update a contact's engagement summary to incorporate a new call. Keep it a few factual sentences.\n\n" +
       `Existing summary:\n${existing.summary}\n\nLatest call summary:\n${callSummary}`,
   );
-  await prisma.person.update({ where: { id: existing.id }, data: { summary: merged } });
+  await prisma.person.update({
+    where: { id: existing.id },
+    data: {
+      summary: merged,
+      // Fill name/background only if we don't already have them.
+      ...(existing.name || !name ? {} : { name }),
+      ...(existing.background || !background ? {} : { background }),
+    },
+  });
   return existing.id;
 }
 
@@ -84,6 +96,8 @@ async function handleCallEnded(ai: AiClient, body: unknown): Promise<void> {
   const transcript = asString(call["transcript"])?.trim() ?? "";
   const emailRaw = metadata?.["email"];
   const email = typeof emailRaw === "string" ? emailRaw.trim().toLowerCase() : "";
+  const name = asString(metadata?.["name"]);
+  const background = asString(metadata?.["background"]) ?? "";
 
   // Log the call FIRST, so it's saved no matter how it ended (declined,
   // dial_failed, no answer) and even if summarizing / person rollup below fails.
@@ -105,7 +119,7 @@ async function handleCallEnded(ai: AiClient, body: unknown): Promise<void> {
 
   // Enrich: summarize and fold into the person's rolling engagement summary.
   const summary = await summarizeCall(ai, transcript);
-  const personId = email ? await rollUpPerson(ai, chat.userId, email, summary) : null;
+  const personId = email ? await rollUpPerson(ai, chat.userId, email, summary, name, background) : null;
   await prisma.call.update({ where: { id: callId }, data: { summary, personId } });
 
   // Notify the chat that placed the call.

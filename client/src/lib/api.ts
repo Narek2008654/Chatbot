@@ -120,7 +120,7 @@ export interface CallHistoryItem {
 
 export interface CallDetail {
   call: CallHistoryItem & { personEmail: string | null; toNumber: string | null };
-  person: { email: string; summary: string } | null;
+  person: { email: string; name: string | null; summary: string } | null;
   history: CallHistoryItem[];
 }
 

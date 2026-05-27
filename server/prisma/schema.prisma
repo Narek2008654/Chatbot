@@ -51,13 +51,15 @@ model Memory {
 
 // A person we've called, identified by email (scoped to the operator's userId).
 model Person {
-  id        String   @id @default(cuid())
-  userId    String
-  email     String
-  summary   String   @default("") // rolling "engagement summary"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  calls     Call[]
+  id         String   @id @default(cuid())
+  userId     String
+  email      String
+  name       String? // display name, captured on first interaction
+  background String   @default("") // operator-provided "what we know" seed
+  summary    String   @default("") // rolling "engagement summary"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  calls      Call[]
 
   @@unique([userId, email])
 }

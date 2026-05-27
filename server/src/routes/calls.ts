@@ -56,7 +56,7 @@ export function createCallsRouter(): Router {
 
     res.json({
       call,
-      person: person ? { email: person.email, summary: person.summary } : null,
+      person: person ? { email: person.email, name: person.name, summary: person.summary } : null,
       history: person ? person.calls : [call],
     });
   });

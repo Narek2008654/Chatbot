@@ -108,7 +108,9 @@ function CallDetailView({ id }: { id: string }) {
   }
 
   const summary = data.person?.summary ?? data.call.summary;
-  const heading = data.person?.email ?? data.call.personEmail ?? data.call.toNumber ?? "Call";
+  const heading =
+    data.person?.name ?? data.person?.email ?? data.call.personEmail ?? data.call.toNumber ?? "Call";
+  const subheading = data.person?.name ? data.person.email : null;
 
   return (
     <>
@@ -121,6 +123,7 @@ function CallDetailView({ id }: { id: string }) {
 
       <header className="mb-8">
         <h1 className="font-display text-3xl font-semibold tracking-tight">{heading}</h1>
+        {subheading && <p className="mt-1 text-sm text-muted-foreground">{subheading}</p>}
       </header>
 
       <section className="mb-10 rounded-2xl border border-border/70 bg-card px-6 py-5 shadow-sm">

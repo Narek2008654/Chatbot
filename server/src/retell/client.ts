@@ -17,6 +17,8 @@ export interface CreatePhoneCallInput {
   agentId?: string;
   /** Arbitrary data stored on the call and echoed back in webhooks (e.g. { chatId }). */
   metadata?: Record<string, unknown>;
+  /** Values that fill {{placeholder}} tokens in the agent's prompt for this call. */
+  dynamicVariables?: Record<string, string>;
 }
 
 export interface RetellClient {
@@ -90,6 +92,7 @@ export function createRetellClient(apiKey: string): RetellClient {
         to_number: input.toNumber,
         ...(input.agentId ? { override_agent_id: input.agentId } : {}),
         ...(input.metadata ? { metadata: input.metadata } : {}),
+        ...(input.dynamicVariables ? { retell_llm_dynamic_variables: input.dynamicVariables } : {}),
       });
       return { callId: String(call["call_id"]) };
     },
