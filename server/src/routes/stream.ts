@@ -129,8 +129,9 @@ export function createStreamRouter(getAi: () => AiClient): Router {
       ? generateChatTitle(ai, content).catch(() => null)
       : null;
 
+    let full = "";
     try {
-      const full = await ai.chat({
+      const reply = ai.chat({
         system,
         messages,
         chatId,
@@ -142,12 +143,17 @@ export function createStreamRouter(getAi: () => AiClient): Router {
         },
       });
 
+      // Stream each chunk to the client as it arrives.
+      for await (const chunk of reply) {
+        if (aborted) break;
+        full += chunk;
+        res.write("data: " + JSON.stringify({ text: chunk }) + "\n\n");
+      }
+
       // If the client went away, stop without writing to a dead socket.
       if (aborted) return;
 
-      res.write("data: " + JSON.stringify({ text: full }) + "\n\n");
-
-      // 7. Save assistant message
+      // 7. Save assistant message after the stream ends
       await prisma.message.create({
         data: { chatId, role: "assistant", content: full },
       });

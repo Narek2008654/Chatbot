@@ -148,9 +148,9 @@ test("POST /api/chats/:id/stream links attachments and forwards image data URLs 
   let captured: { system: string; messages: import("../ai/client.js").ChatMessage[] } | null = null;
   const capturingApp = createApp({
     ai: createFakeAi({
-      chat: async (input) => {
+      // eslint-disable-next-line require-yield
+      chat: async function* (input) {
         captured = input;
-        return "";
       },
     }),
     requireAuth: fakeAuth,

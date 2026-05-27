@@ -35,10 +35,19 @@ export interface RetellClient {
 export function createRetellClient(apiKey: string): RetellClient {
   async function send(path: string, init: RequestInit): Promise<Response> {
     if (!apiKey) throw new Error("Retell API key not configured");
-    const res = await fetch(`${RETELL_BASE}${path}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${apiKey}`, ...init.headers },
-    });
+    // Bound each request so a slow Retell call can't hang the chat turn.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    let res: Response;
+    try {
+      res = await fetch(`${RETELL_BASE}${path}`, {
+        ...init,
+        headers: { Authorization: `Bearer ${apiKey}`, ...init.headers },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`Retell ${path} failed: ${res.status}${text ? ` ${text}` : ""}`);

@@ -53,7 +53,7 @@ export interface AiClient {
     chatId?: string;
     /** Looks up what we know about a person by email (DB-backed, supplied by the route). */
     lookupPerson?: (email: string) => Promise<CallerInfo | null>;
-  }): Promise<string>;
+  }): AsyncIterable<string>;
   complete(prompt: string): Promise<string>;
 }
 
@@ -282,7 +282,7 @@ export function createOpenAiClient(apiKey: string, retell: RetellClient): AiClie
       return res.data[0].embedding;
     },
 
-    async chat({
+    async *chat({
       system,
       messages,
       chatId,
@@ -292,35 +292,51 @@ export function createOpenAiClient(apiKey: string, retell: RetellClient): AiClie
       messages: ChatMessage[];
       chatId?: string;
       lookupPerson?: (email: string) => Promise<CallerInfo | null>;
-    }): Promise<string> {
+    }): AsyncGenerator<string> {
       const convo = toOpenAiMessages(system, messages) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
       const deps: ToolDeps = { retell, chatId, lookupPerson };
 
-      // The model may chain tools (e.g. lookup_person → place_phone_call) before
-      // answering, so loop: run any requested tools and ask again until it
-      // returns plain text. Bounded to avoid runaway tool loops.
+      // Stream the reply token-by-token. The model may chain tools (e.g.
+      // lookup_person → place_phone_call) before answering, so loop: stream any
+      // text, run any requested tools, then ask again. Bounded to avoid runaway.
       for (let round = 0; round < 5; round++) {
-        const res = await openai.chat.completions.create({
+        const stream = await openai.chat.completions.create({
           model: env.CHAT_MODEL,
           messages: convo,
           tools: TOOLS,
+          stream: true,
         });
-        const message = res.choices[0].message;
 
-        // No tool calls → the model answered directly.
-        if (!message.tool_calls || message.tool_calls.length === 0) {
-          return message.content ?? "";
+        // Tool-call fragments arrive split across chunks; reassemble them by index.
+        const toolCalls: Record<number, { id: string; name: string; args: string }> = {};
+        let text = "";
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) {
+            text += delta.content;
+            yield delta.content;
+          }
+          for (const tc of delta?.tool_calls ?? []) {
+            const c = (toolCalls[tc.index] ??= { id: "", name: "", args: "" });
+            if (tc.id) c.id = tc.id;
+            if (tc.function?.name) c.name += tc.function.name;
+            if (tc.function?.arguments) c.args += tc.function.arguments;
+          }
         }
 
-        convo.push(message);
-        for (const call of message.tool_calls) {
+        const calls = Object.values(toolCalls).map((c) => ({
+          id: c.id,
+          type: "function" as const,
+          function: { name: c.name, arguments: c.args },
+        }));
+        if (calls.length === 0) return; // model answered; already streamed
+
+        convo.push({ role: "assistant", content: text || null, tool_calls: calls });
+        for (const call of calls) {
           const result = await runToolCall(deps, call);
           convo.push({ role: "tool", tool_call_id: call.id, content: result });
         }
       }
-
-      // Tool loop exhausted without producing a plain answer.
-      return "";
     },
 
     async complete(prompt: string): Promise<string> {

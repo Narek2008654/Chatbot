@@ -39,11 +39,11 @@ export function createFakeAi(overrides?: Partial<AiClient>): AiClient {
       return Array.from({ length: 1536 }, () => rand() * 2 - 1);
     },
 
-    async chat(_input: {
+    async *chat(_input: {
       system: string;
       messages: ChatMessage[];
-    }): Promise<string> {
-      return "Hello from the fake AI.";
+    }): AsyncGenerator<string> {
+      yield "Hello from the fake AI.";
     },
 
     async complete(_prompt: string): Promise<string> {

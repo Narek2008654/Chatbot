@@ -22,9 +22,10 @@ describe("createFakeAi", () => {
     expect(v1).not.toEqual(v2);
   });
 
-  it("chat returns a non-empty string", async () => {
+  it("chat streams a non-empty reply", async () => {
     const ai = createFakeAi();
-    const text = await ai.chat({ system: "sys", messages: [] });
+    let text = "";
+    for await (const chunk of ai.chat({ system: "sys", messages: [] })) text += chunk;
     expect(text).not.toBe("");
   });
 
