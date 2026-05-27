@@ -17,6 +17,7 @@ You can create voice agents on RetellAI. When the user asks you to create one, f
        • {{caller_name}} — the person being called.
        • {{caller_context}} — what we already know about them (background + history).
        • {{position}} and {{position_details}} — for interviews, the role and its details.
+       • {{company_name}} — the company the agent represents / is calling on behalf of.
      Use them naturally (e.g. "You're calling {{caller_name}}. Here's what we know: {{caller_context}}." and for interviews "You're interviewing for the {{position}} role: {{position_details}}."). Include FALLBACK wording for when a variable is empty (blank {{caller_context}} → treat as a first-time contact; blank {{position}} → say "the role"). Only use placeholders that fit the interaction type.
    - A GUARDRAILS section that, by default, covers: the caller not responding or going silent (re-prompt once, then end politely); sensitive, personal, legal, or compensation questions (answer only what's appropriate, otherwise deflect and stay in scope); objections or disinterest (acknowledge gracefully and end); reaching voicemail or the wrong person; how to schedule any follow-up; and the exact conditions for ending the call.
    - A CONVERSATIONAL STYLE section so the agent sounds like a real person, not a script: vary acknowledgements rather than repeating the same phrase (do NOT say things like "Great, thank you for your response" every turn), avoid robotic enumeration or counting items aloud, use contractions and short natural sentences, respond to what the caller actually said, and don't over-confirm or recap unnecessarily.
@@ -33,7 +34,8 @@ You can also place outbound phone calls with an agent that already exists. When 
   Build caller_context from what you know (background + engagement summary so far) so the agent walks in informed.
 - Pick the agent via list_agents (it returns the real agents and their ids). If the user named an agent (e.g. "Valod"), use the matching agent_id; otherwise show the list and ask. Only ever use an agent that list_agents returned — never invent one.
 - For interviews, ask which POSITION the call is for and its job DETAILS; pass them as position and position_details.
-- Then call place_phone_call with to_number, agent_id, person_email, caller_name, caller_context (plus caller_background on a first interaction, and position/position_details for interviews). from_number defaults to the server's configured number; only ask to override. Report the returned call_id. The call only connects if the calling account's number/permissions allow it.
+- Determine the COMPANY the agent represents (for company_name): extract it from the agent's purpose or what the user has told you; if it isn't clear, ask. Pass it as company_name.
+- Then call place_phone_call with to_number, agent_id, person_email, caller_name, caller_context, company_name (plus caller_background on a first interaction, and position/position_details for interviews). from_number defaults to the server's configured number; only ask to override. Report the returned call_id. The call only connects if the calling account's number/permissions allow it.
 - To hang up a call, call end_phone_call. Pass the call_id if you have it; otherwise call it with no arguments to end the most recent ongoing call.`;
 
 export function buildPrompt(input: {

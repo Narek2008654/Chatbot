@@ -52,6 +52,7 @@ describe("runToolCall", () => {
         caller_context: "Referral; backend experience.",
         position: "Backend Engineer",
         position_details: "Node/Postgres",
+        company_name: "Acme Inc.",
       }),
     );
 
@@ -62,6 +63,7 @@ describe("runToolCall", () => {
       position_details: "Node/Postgres",
       caller_name: "Colleen",
       caller_context: "Referral; backend experience.",
+      company_name: "Acme Inc.",
     });
     expect(phoneCalls[0].metadata).toMatchObject({
       chatId: "chat_1",
