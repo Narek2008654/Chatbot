@@ -158,6 +158,39 @@ describe("createRetellClient", () => {
     await expect(createRetellClient("sk").stopCall("nope")).rejects.toThrow(/404/);
   });
 
+  it("extracts {{placeholders}} an agent's prompt + greeting reference", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ response_engine: { llm_id: "llm_1" } }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          general_prompt: "Calling {{caller_name}} about {{position}}. Details: {{position_details}}.",
+          begin_message: "Hi {{caller_name}}, from {{company_name}}.",
+        }),
+      } as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const vars = await createRetellClient("sk").getRequiredVariablesForAgent("agent_a");
+
+    expect(new Set(vars)).toEqual(
+      new Set(["caller_name", "position", "position_details", "company_name"]),
+    );
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/get-agent/agent_a");
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/get-retell-llm/llm_1");
+  });
+
+  it("returns [] (and doesn't throw) when agent introspection fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 404, text: async () => "nope" } as Response),
+    );
+    await expect(createRetellClient("sk").getRequiredVariablesForAgent("missing")).resolves.toEqual([]);
+  });
+
   it("lists agents (name + id), defaulting a missing name", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: true,

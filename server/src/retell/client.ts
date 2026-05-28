@@ -30,6 +30,8 @@ export interface RetellClient {
   stopLatestOngoingCall(): Promise<string>;
   /** List the account's agents (latest version of each). */
   listAgents(): Promise<{ agentId: string; name: string }[]>;
+  /** Names of {{placeholders}} referenced in the agent's prompt and greeting. */
+  getRequiredVariablesForAgent(agentId: string): Promise<string[]>;
 }
 
 export function createRetellClient(apiKey: string): RetellClient {
@@ -141,6 +143,22 @@ export function createRetellClient(apiKey: string): RetellClient {
         name: a["agent_name"] ? String(a["agent_name"]) : "(unnamed)",
       }));
     },
+
+    async getRequiredVariablesForAgent(agentId: string) {
+      try {
+        const agent = (await get(`/get-agent/${encodeURIComponent(agentId)}`)) as Record<string, unknown>;
+        const llmId = (agent["response_engine"] as Record<string, unknown> | undefined)?.["llm_id"];
+        if (typeof llmId !== "string") return [];
+        const llm = (await get(`/get-retell-llm/${encodeURIComponent(llmId)}`)) as Record<string, unknown>;
+        const text = `${String(llm["general_prompt"] ?? "")} ${String(llm["begin_message"] ?? "")}`;
+        const vars = new Set<string>();
+        for (const m of text.matchAll(/\{\{(\w+)\}\}/g)) vars.add(m[1]);
+        return [...vars];
+      } catch {
+        // Best-effort: if Retell introspection fails, don't block the call.
+        return [];
+      }
+    },
   };
 }
 
@@ -151,10 +169,13 @@ export function createFakeRetellClient(overrides?: {
   stopCall?: RetellClient["stopCall"];
   stopLatestOngoingCall?: RetellClient["stopLatestOngoingCall"];
   listAgents?: RetellClient["listAgents"];
+  getRequiredVariablesForAgent?: RetellClient["getRequiredVariablesForAgent"];
   calls?: CreateVoiceAgentInput[];
   phoneCalls?: CreatePhoneCallInput[];
   stoppedCallIds?: string[];
   agents?: { agentId: string; name: string }[];
+  /** Map of agent_id → required {{placeholders}} the prompt references. */
+  requiredVariables?: Record<string, string[]>;
 }): RetellClient {
   return {
     createVoiceAgent:
@@ -181,5 +202,8 @@ export function createFakeRetellClient(overrides?: {
         return "call_fake";
       }),
     listAgents: overrides?.listAgents ?? (async () => overrides?.agents ?? []),
+    getRequiredVariablesForAgent:
+      overrides?.getRequiredVariablesForAgent ??
+      (async (agentId) => overrides?.requiredVariables?.[agentId] ?? []),
   };
 }

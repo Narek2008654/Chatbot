@@ -171,6 +171,54 @@ describe("runToolCall", () => {
     });
   });
 
+  it("refuses to place a call when the agent expects vars the operator didn't supply", async () => {
+    const retell = createFakeRetellClient({
+      requiredVariables: {
+        agent_x: ["caller_name", "caller_context", "position", "position_details", "company_name"],
+      },
+    });
+
+    const result = await runToolCall(
+      { retell },
+      toolCall("place_phone_call", {
+        to_number: "+37491452889",
+        agent_id: "agent_x",
+        caller_name: "Albert",
+        // position / position_details / company_name omitted on purpose
+      }),
+    );
+
+    expect(result).toMatch(/Cannot place the call/i);
+    expect(result).toContain("{{position}}");
+    expect(result).toContain("{{position_details}}");
+    expect(result).toContain("{{company_name}}");
+  });
+
+  it("places the call when all referenced vars are provided (caller_context can be empty)", async () => {
+    const phoneCalls: CreatePhoneCallInput[] = [];
+    const retell = createFakeRetellClient({
+      phoneCalls,
+      requiredVariables: {
+        agent_x: ["caller_name", "caller_context", "position", "company_name"],
+      },
+    });
+
+    const result = await runToolCall(
+      { retell },
+      toolCall("place_phone_call", {
+        to_number: "+37491452889",
+        agent_id: "agent_x",
+        caller_name: "Albert",
+        position: "Backend Engineer",
+        company_name: "EPAM",
+        // caller_context intentionally empty — first interaction
+      }),
+    );
+
+    expect(result).toContain("Started outbound call");
+    expect(phoneCalls).toHaveLength(1);
+  });
+
   it("looks up a known contact", async () => {
     const result = await runToolCall(
       {

@@ -344,10 +344,26 @@ export async function runToolCall(deps: ToolDeps, call: ToolCall): Promise<strin
           if (args[key]) vars[key] = String(args[key]);
         }
 
+        // Refuse if the agent's prompt expects per-call vars the operator
+        // didn't provide (e.g. {{position}}, {{company_name}}) — otherwise the
+        // agent would speak the placeholder literally on the call.
+        const agentIdParam = args.agent_id ? String(args.agent_id) : undefined;
+        if (agentIdParam) {
+          const referenced = await retell.getRequiredVariablesForAgent(agentIdParam);
+          const SKIPPABLE = new Set(["caller_name", "caller_context", "questions", "call_reason"]);
+          const missing = referenced.filter((v) => !SKIPPABLE.has(v) && !vars[v]);
+          if (missing.length > 0) {
+            return (
+              `Cannot place the call: the agent's prompt expects ${missing.map((v) => `{{${v}}}`).join(", ")} but no value was supplied. ` +
+              `Ask the user for ${missing.join(", ")} (e.g. the role/position, job details, company name), then call place_phone_call again with those filled in.`
+            );
+          }
+        }
+
         const { callId } = await retell.createPhoneCall({
           fromNumber: String(args.from_number ?? env.RETELL_FROM_NUMBER ?? ""),
           toNumber: String(args.to_number),
-          agentId: args.agent_id ? String(args.agent_id) : undefined,
+          agentId: agentIdParam,
           metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
           dynamicVariables: Object.keys(vars).length > 0 ? vars : undefined,
         });
