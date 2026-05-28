@@ -114,7 +114,7 @@ async function maybeSendNoPickupSms(
   const vars = (call["retell_llm_dynamic_variables"] as Record<string, unknown>) ?? {};
   // Returning contact (we already know about them) → use the followup template
   // when one is set; first interaction → use the asks-if-interested template.
-  const isReturning = typeof vars["caller_context"] === "string" && (vars["caller_context"] as string).trim() !== "";
+  const isReturning = !!asString(vars["caller_context"])?.trim();
   const template =
     (isReturning && settings.noPickupSmsFollowup) || settings.noPickupSms || settings.noPickupSmsFollowup;
   if (!template) return;
