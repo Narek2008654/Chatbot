@@ -323,8 +323,12 @@ test("does NOT send a no-pickup SMS when the call connected normally", async () 
   expect(smsLog).toHaveLength(0);
 });
 
-test("falls back to a default template when the agent has no AgentSettings row", async () => {
+test("when the agent has no template, asks OpenAI to draft an SMS from the chat context", async () => {
   const chatId = await createChat();
+  // Seed a couple of chat messages that describe the call's purpose so the
+  // draft prompt has something to read.
+  await prisma.message.create({ data: { chatId, role: "user", content: "Call Pat about the backend role at EPAM" } });
+  await prisma.message.create({ data: { chatId, role: "assistant", content: "Initiating the call to Pat now." } });
   const agentId = "agent_no_settings";
   // intentionally NO prisma.agentSettings.create() — covers externally-created agents
 
@@ -343,9 +347,11 @@ test("falls back to a default template when the agent has no AgentSettings row",
       },
     });
 
+  // The shared fake AI returns the same canned summary string for every
+  // ai.complete() call — so asserting the SMS body equals it proves we did go
+  // through the AI-drafted path (not a template or a default constant).
   expect(smsLog).toHaveLength(1);
-  expect(smsLog[0].body).toContain("Pat");
-  expect(smsLog[0].body).toContain("sorry we missed you");
+  expect(smsLog[0].body).toBe("Caller confirmed the interview for Tuesday at 3pm.");
 });
 
 test("calls with no chat metadata are ignored (still 200)", async () => {

@@ -19,12 +19,6 @@ const INAUDIBLE_MARKER = /\(inaudible[^)]*\)/gi;
 /** Twilio concatenated-SMS hard limit; leaving a small safety margin. */
 const SMS_MAX_BODY = 1500;
 
-/** Used when an agent has no AgentSettings row (e.g. created outside our tool). */
-const DEFAULT_NO_PICKUP_SMS =
-  "Hi {{caller_name}}, sorry we missed you. Reply or call back when you have a moment.";
-const DEFAULT_NO_PICKUP_SMS_FOLLOWUP =
-  "Hi {{caller_name}}, sorry we missed you — {{call_reason}}. Reply or call back when you have a moment.";
-
 /** Truncate an SMS body with an ellipsis if it would exceed Twilio's limit. */
 function clampSmsBody(text: string): string {
   return text.length <= SMS_MAX_BODY ? text : text.slice(0, SMS_MAX_BODY - 1).trimEnd() + "…";
@@ -148,9 +142,11 @@ async function rollUpPerson(
  * by the surrounding handler and don't break webhook acknowledgement.
  */
 async function maybeSendNoPickupSms(
+  ai: AiClient,
   twilio: TwilioClient,
   call: Record<string, unknown>,
   reason: string,
+  chatId: string,
 ): Promise<void> {
   // Send when Retell reports a no-pickup reason OR when nothing real was said
   // (e.g. the user declined and the agent talked into silence/voicemail).
@@ -161,26 +157,51 @@ async function maybeSendNoPickupSms(
   const toNumber = asString(call["to_number"]);
   if (!agentId || !toNumber) return;
 
-  // No AgentSettings row (agent created outside our tool) → fall back to defaults
-  // so we still send a no-pickup SMS. An explicit empty string from the user is
-  // still respected ("they configured no SMS on purpose").
-  const settings = await prisma.agentSettings.findUnique({ where: { agentId } });
-  const noPickupSms = settings?.noPickupSms ?? DEFAULT_NO_PICKUP_SMS;
-  const noPickupSmsFollowup = settings?.noPickupSmsFollowup ?? DEFAULT_NO_PICKUP_SMS_FOLLOWUP;
-
   const vars = (call["retell_llm_dynamic_variables"] as Record<string, unknown>) ?? {};
-  // Returning contact (we already know about them) → use the followup template
-  // when one is set; first interaction → use the asks-if-interested template.
   const isReturning = !!asString(vars["caller_context"])?.trim();
-  const template = (isReturning && noPickupSmsFollowup) || noPickupSms || noPickupSmsFollowup;
-  if (!template) return;
-  const body = fillTemplate(template, vars).trim();
+
+  // Prefer a configured template when present; otherwise have OpenAI draft a
+  // contextual follow-up using the chat history so the message states why we
+  // called and asks the contact to reach back.
+  const settings = await prisma.agentSettings.findUnique({ where: { agentId } });
+  const template = (isReturning && settings?.noPickupSmsFollowup) || settings?.noPickupSms || settings?.noPickupSmsFollowup;
+  const body = template
+    ? fillTemplate(template, vars).trim()
+    : await draftDeclineFollowupSms(ai, chatId, vars);
   if (!body) return;
 
   const from = asString(call["from_number"]) ?? env.RETELL_FROM_NUMBER;
   if (!from) return;
 
   await twilio.sendSms({ from, to: toNumber, body: clampSmsBody(body) });
+}
+
+/**
+ * Ask OpenAI to draft a short SMS for a declined / unanswered call. Reads the
+ * chat that placed the call so the message can state the actual purpose.
+ */
+async function draftDeclineFollowupSms(
+  ai: AiClient,
+  chatId: string,
+  vars: Record<string, unknown>,
+): Promise<string> {
+  const recent = await prisma.message.findMany({
+    where: { chatId },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { role: true, content: true },
+  });
+  const history = recent.reverse().map((m) => `${m.role}: ${m.content}`).join("\n");
+  const callerName = asString(vars["caller_name"]) ?? "";
+  const prompt =
+    "We just placed an outbound phone call and the callee declined or didn't pick up. " +
+    "Draft a short (1-2 sentences, well under 320 characters), polite SMS to send to them. " +
+    "State why we called (read the purpose from the chat history below) and ask them to reach back when they have a moment. " +
+    `Address them by first name if available: ${callerName || "(no name)"}. ` +
+    "Output ONLY the SMS body — no quotes, no preamble.\n\n" +
+    "Chat history:\n" +
+    history;
+  return (await ai.complete(prompt)).trim();
 }
 
 export async function handleCallEnded(ai: AiClient, twilio: TwilioClient, body: unknown): Promise<void> {
@@ -241,7 +262,7 @@ export async function handleCallEnded(ai: AiClient, twilio: TwilioClient, body: 
 
   // If the call didn't reach a real person, fire the no-pickup SMS (best-effort).
   // Log failures (e.g. missing Twilio credentials) instead of swallowing them silently.
-  await maybeSendNoPickupSms(twilio, call, reason).catch((err: unknown) => {
+  await maybeSendNoPickupSms(ai, twilio, call, reason, chatId).catch((err: unknown) => {
     console.error("[webhook] no-pickup SMS failed:", err instanceof Error ? err.message : err);
   });
 }
