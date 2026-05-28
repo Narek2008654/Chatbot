@@ -263,6 +263,41 @@ test("sends a no-pickup SMS on user_hangup when the user never said anything rea
   expect(smsLog[0].body).toBe("Hi Albert, interested in Backend Engineer at EPAM?");
 });
 
+test("clamps the SMS body so Twilio never sees more than 1500 characters", async () => {
+  const chatId = await createChat();
+  const agentId = "agent_long_sms";
+  // Template that interpolates a huge {{position_details}} — exactly the case
+  // that previously caused Twilio error 21617.
+  await prisma.agentSettings.create({
+    data: {
+      userId: USER,
+      agentId,
+      noPickupSms: "Hi {{caller_name}}: {{position_details}}",
+      noPickupSmsFollowup: "",
+    },
+  });
+  const longDetails = "x".repeat(5000);
+
+  await request(app)
+    .post("/api/retell/webhook")
+    .send({
+      event: "call_ended",
+      call: {
+        call_id: "call_long_1",
+        agent_id: agentId,
+        from_number: "+19018836036",
+        to_number: "+37496200819",
+        disconnection_reason: "dial_no_answer",
+        metadata: { chatId, email: "valer@example.com" },
+        retell_llm_dynamic_variables: { caller_name: "Valer", position_details: longDetails },
+      },
+    });
+
+  expect(smsLog).toHaveLength(1);
+  expect(smsLog[0].body.length).toBeLessThanOrEqual(1500);
+  expect(smsLog[0].body.endsWith("…")).toBe(true);
+});
+
 test("does NOT send a no-pickup SMS when the call connected normally", async () => {
   const chatId = await createChat();
   const agentId = "agent_nopickup_y";

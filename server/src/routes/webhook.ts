@@ -16,6 +16,14 @@ const NO_PICKUP_REASONS = new Set([
 const USER_LINE_PREFIX = /^\s*user\s*:\s*/i;
 const INAUDIBLE_MARKER = /\(inaudible[^)]*\)/gi;
 
+/** Twilio concatenated-SMS hard limit; leaving a small safety margin. */
+const SMS_MAX_BODY = 1500;
+
+/** Truncate an SMS body with an ellipsis if it would exceed Twilio's limit. */
+function clampSmsBody(text: string): string {
+  return text.length <= SMS_MAX_BODY ? text : text.slice(0, SMS_MAX_BODY - 1).trimEnd() + "…";
+}
+
 /**
  * True when at least one "User:" line in the transcript has real content after
  * stripping (inaudible …) markers — i.e. the user actually said something.
@@ -143,7 +151,7 @@ async function maybeSendNoPickupSms(
   const from = asString(call["from_number"]) ?? env.RETELL_FROM_NUMBER;
   if (!from) return;
 
-  await twilio.sendSms({ from, to: toNumber, body });
+  await twilio.sendSms({ from, to: toNumber, body: clampSmsBody(body) });
 }
 
 async function handleCallEnded(ai: AiClient, twilio: TwilioClient, body: unknown): Promise<void> {
