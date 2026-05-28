@@ -154,7 +154,7 @@ async function maybeSendNoPickupSms(
   await twilio.sendSms({ from, to: toNumber, body: clampSmsBody(body) });
 }
 
-async function handleCallEnded(ai: AiClient, twilio: TwilioClient, body: unknown): Promise<void> {
+export async function handleCallEnded(ai: AiClient, twilio: TwilioClient, body: unknown): Promise<void> {
   const payload = body as { event?: string; call?: Record<string, unknown> };
   const call = payload.call;
   if (payload.event !== "call_ended" || !call) return;
