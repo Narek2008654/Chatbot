@@ -109,10 +109,16 @@ async function maybeSendNoPickupSms(
   if (!agentId || !toNumber) return;
 
   const settings = await prisma.agentSettings.findUnique({ where: { agentId } });
-  if (!settings?.noPickupSms) return;
+  if (!settings) return;
 
   const vars = (call["retell_llm_dynamic_variables"] as Record<string, unknown>) ?? {};
-  const body = fillTemplate(settings.noPickupSms, vars).trim();
+  // Returning contact (we already know about them) → use the followup template
+  // when one is set; first interaction → use the asks-if-interested template.
+  const isReturning = typeof vars["caller_context"] === "string" && (vars["caller_context"] as string).trim() !== "";
+  const template =
+    (isReturning && settings.noPickupSmsFollowup) || settings.noPickupSms || settings.noPickupSmsFollowup;
+  if (!template) return;
+  const body = fillTemplate(template, vars).trim();
   if (!body) return;
 
   const from = asString(call["from_number"]) ?? env.RETELL_FROM_NUMBER;

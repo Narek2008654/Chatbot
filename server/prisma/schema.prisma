@@ -66,12 +66,15 @@ model Person {
 
 // Per-agent settings we manage outside of Retell (e.g. the SMS to send on no pickup).
 model AgentSettings {
-  id           String   @id @default(cuid())
-  userId       String
-  agentId      String   @unique
-  noPickupSms  String   @default("")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  userId              String
+  agentId             String   @unique
+  // SMS for FIRST interactions — asks the callee whether they're interested.
+  noPickupSms         String   @default("")
+  // SMS for RETURNING contacts — states the specific reason for this call.
+  noPickupSmsFollowup String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 // One logged outbound call. `id` is Retell's call_id (idempotent on webhook retries).

@@ -54,7 +54,10 @@ export interface AiClient {
     /** Looks up what we know about a person by email (DB-backed, supplied by the route). */
     lookupPerson?: (email: string) => Promise<CallerInfo | null>;
     /** Persists per-agent settings after create_retell_voice_agent (DB-backed). */
-    saveAgentSettings?: (agentId: string, settings: { noPickupSms: string }) => Promise<void>;
+    saveAgentSettings?: (
+      agentId: string,
+      settings: { noPickupSms: string; noPickupSmsFollowup: string },
+    ) => Promise<void>;
   }): AsyncIterable<string>;
   complete(prompt: string): Promise<string>;
 }
@@ -80,7 +83,12 @@ const CREATE_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
         no_pickup_sms: {
           type: "string",
           description:
-            "Optional SMS to send the callee if the call doesn't connect (no answer, busy, voicemail, dial failed). May use {{caller_name}}, {{position}}, {{company_name}} — they'll be filled at send time.",
+            "SMS for FIRST interactions when the call doesn't connect — asks the callee whether they're interested. May use {{caller_name}}, {{position}}, {{position_details}}, {{company_name}} — filled at send time.",
+        },
+        no_pickup_sms_followup: {
+          type: "string",
+          description:
+            "SMS for RETURNING contacts when the call doesn't connect — states the specific reason for the call. May use {{caller_name}}, {{position}}, {{position_details}}, {{company_name}}, {{call_reason}} — the operator supplies {{call_reason}} at call time (e.g. 'I had a question about your background').",
         },
       },
       required: ["name", "agent_prompt", "greeting", "voice_id"],
@@ -150,6 +158,11 @@ const PLACE_CALL_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           description:
             "Specific questions for this call, only when the agent expects per-call questions ({{questions}}) — e.g. technical questions that vary by role. Fills {{questions}}.",
         },
+        call_reason: {
+          type: "string",
+          description:
+            "Short reason for THIS call when contacting a returning candidate (e.g. 'I had a question about your background'). Used in the followup no-pickup SMS. Fills {{call_reason}}.",
+        },
       },
       required: ["to_number"],
     },
@@ -214,6 +227,7 @@ const ALLOWED_PLACEHOLDERS = new Set([
   "position_details",
   "company_name",
   "questions",
+  "call_reason",
 ]);
 
 /** Common model slip-ups → the standard placeholder they meant. */
@@ -258,8 +272,11 @@ export interface ToolDeps {
   retell: RetellClient;
   chatId?: string;
   lookupPerson?: (email: string) => Promise<CallerInfo | null>;
-  /** Persist per-agent settings (e.g. the SMS to send on no pickup). */
-  saveAgentSettings?: (agentId: string, settings: { noPickupSms: string }) => Promise<void>;
+  /** Persist per-agent settings (e.g. the no-pickup SMS templates). */
+  saveAgentSettings?: (
+    agentId: string,
+    settings: { noPickupSms: string; noPickupSmsFollowup: string },
+  ) => Promise<void>;
 }
 
 export async function runToolCall(deps: ToolDeps, call: ToolCall): Promise<string> {
@@ -270,18 +287,25 @@ export async function runToolCall(deps: ToolDeps, call: ToolCall): Promise<strin
       case "create_retell_voice_agent": {
         const promptN = normalizePlaceholders(String(args.agent_prompt));
         const greetingN = normalizePlaceholders(String(args.greeting));
-        const smsRaw = args.no_pickup_sms ? String(args.no_pickup_sms) : "";
-        const smsN = normalizePlaceholders(smsRaw);
+        const smsN = normalizePlaceholders(args.no_pickup_sms ? String(args.no_pickup_sms) : "");
+        const smsFollowupN = normalizePlaceholders(
+          args.no_pickup_sms_followup ? String(args.no_pickup_sms_followup) : "",
+        );
 
         const unknown = [
-          ...new Set([...promptN.unknown, ...greetingN.unknown, ...smsN.unknown]),
+          ...new Set([
+            ...promptN.unknown,
+            ...greetingN.unknown,
+            ...smsN.unknown,
+            ...smsFollowupN.unknown,
+          ]),
         ];
         if (unknown.length > 0) {
           return (
             `Cannot create the agent: the draft uses placeholders that aren't allowed: ${unknown
               .map((p) => `{{${p}}}`)
-              .join(", ")}. The ONLY allowed placeholders are {{caller_name}}, {{caller_context}}, {{position}}, {{position_details}}, {{company_name}}, {{questions}}. ` +
-            `Replace each unknown placeholder with the correct standard name (e.g. {{job_title}} → {{position}}, {{job_description}} → {{position_details}}, {{company}} → {{company_name}}) in the prompt, greeting, AND the no-pickup SMS, then call create_retell_voice_agent again.`
+              .join(", ")}. The ONLY allowed placeholders are {{caller_name}}, {{caller_context}}, {{position}}, {{position_details}}, {{company_name}}, {{questions}}, {{call_reason}}. ` +
+            `Replace each unknown placeholder with the correct standard name (e.g. {{job_title}} → {{position}}, {{job_description}} → {{position_details}}, {{company}} → {{company_name}}) in the prompt, greeting, AND both no-pickup SMS templates, then call create_retell_voice_agent again.`
           );
         }
 
@@ -291,8 +315,11 @@ export async function runToolCall(deps: ToolDeps, call: ToolCall): Promise<strin
           greeting: greetingN.text,
           voiceId: String(args.voice_id),
         });
-        if (smsRaw && deps.saveAgentSettings) {
-          await deps.saveAgentSettings(agentId, { noPickupSms: smsN.text });
+        if (deps.saveAgentSettings && (smsN.text || smsFollowupN.text)) {
+          await deps.saveAgentSettings(agentId, {
+            noPickupSms: smsN.text,
+            noPickupSmsFollowup: smsFollowupN.text,
+          });
         }
         return `Created Retell agent "${String(args.name)}" — agent_id ${agentId}.`;
       }
@@ -312,6 +339,7 @@ export async function runToolCall(deps: ToolDeps, call: ToolCall): Promise<strin
           "caller_context",
           "company_name",
           "questions",
+          "call_reason",
         ] as const) {
           if (args[key]) vars[key] = String(args[key]);
         }
@@ -378,7 +406,10 @@ export function createOpenAiClient(apiKey: string, retell: RetellClient): AiClie
       messages: ChatMessage[];
       chatId?: string;
       lookupPerson?: (email: string) => Promise<CallerInfo | null>;
-      saveAgentSettings?: (agentId: string, settings: { noPickupSms: string }) => Promise<void>;
+      saveAgentSettings?: (
+        agentId: string,
+        settings: { noPickupSms: string; noPickupSmsFollowup: string },
+      ) => Promise<void>;
     }): AsyncGenerator<string> {
       const convo = toOpenAiMessages(system, messages) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
       const deps: ToolDeps = { retell, chatId, lookupPerson, saveAgentSettings };

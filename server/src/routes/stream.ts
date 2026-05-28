@@ -144,8 +144,16 @@ export function createStreamRouter(getAi: () => AiClient): Router {
         saveAgentSettings: async (agentId, settings) => {
           await prisma.agentSettings.upsert({
             where: { agentId },
-            create: { userId: req.userId!, agentId, noPickupSms: settings.noPickupSms },
-            update: { noPickupSms: settings.noPickupSms },
+            create: {
+              userId: req.userId!,
+              agentId,
+              noPickupSms: settings.noPickupSms,
+              noPickupSmsFollowup: settings.noPickupSmsFollowup,
+            },
+            update: {
+              noPickupSms: settings.noPickupSms,
+              noPickupSmsFollowup: settings.noPickupSmsFollowup,
+            },
           });
         },
       });

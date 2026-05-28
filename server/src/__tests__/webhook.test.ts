@@ -189,6 +189,41 @@ test("sends a no-pickup SMS when the call didn't connect and the agent has a tem
   );
 });
 
+test("picks the followup SMS template when caller_context is non-empty (returning contact)", async () => {
+  const chatId = await createChat();
+  const agentId = "agent_followup_x";
+  await prisma.agentSettings.create({
+    data: {
+      userId: USER,
+      agentId,
+      noPickupSms: "Hi {{caller_name}}, interested in {{position}} at {{company_name}}?",
+      noPickupSmsFollowup: "Hi {{caller_name}}, sorry we missed you — {{call_reason}}",
+    },
+  });
+
+  await request(app)
+    .post("/api/retell/webhook")
+    .send({
+      event: "call_ended",
+      call: {
+        call_id: "call_followup_1",
+        agent_id: agentId,
+        from_number: "+19018836036",
+        to_number: "+37496200819",
+        disconnection_reason: "voicemail_reached",
+        metadata: { chatId, email: "valer@example.com" },
+        retell_llm_dynamic_variables: {
+          caller_name: "Valer",
+          caller_context: "Already spoke about the AI Consultant role; agreed to follow up.",
+          call_reason: "I had a question about your background",
+        },
+      },
+    });
+
+  expect(smsLog).toHaveLength(1);
+  expect(smsLog[0].body).toBe("Hi Valer, sorry we missed you — I had a question about your background");
+});
+
 test("does NOT send a no-pickup SMS when the call connected normally", async () => {
   const chatId = await createChat();
   const agentId = "agent_nopickup_y";

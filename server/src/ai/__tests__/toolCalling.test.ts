@@ -97,15 +97,19 @@ describe("runToolCall", () => {
     expect(unknown).toEqual(["nope"]);
   });
 
-  it("saves the no-pickup SMS template when one is provided at creation", async () => {
-    const saved: Array<{ agentId: string; noPickupSms: string }> = [];
+  it("saves both no-pickup SMS templates (first + followup) at creation", async () => {
+    const saved: Array<{ agentId: string; noPickupSms: string; noPickupSmsFollowup: string }> = [];
     const retell = createFakeRetellClient();
 
     await runToolCall(
       {
         retell,
         saveAgentSettings: async (agentId, settings) => {
-          saved.push({ agentId, noPickupSms: settings.noPickupSms });
+          saved.push({
+            agentId,
+            noPickupSms: settings.noPickupSms,
+            noPickupSmsFollowup: settings.noPickupSmsFollowup,
+          });
         },
       },
       toolCall("create_retell_voice_agent", {
@@ -113,12 +117,17 @@ describe("runToolCall", () => {
         agent_prompt: "p",
         greeting: "g",
         voice_id: "retell-Cimo",
-        no_pickup_sms: "Hi {{caller_name}}, sorry we missed you about {{position}}.",
+        no_pickup_sms: "Hi {{caller_name}}, sorry we missed you about {{position}} at {{company_name}} — interested?",
+        no_pickup_sms_followup: "Hi {{caller_name}}, sorry we missed you — {{call_reason}}",
       }),
     );
 
     expect(saved).toEqual([
-      { agentId: "agent_fake", noPickupSms: "Hi {{caller_name}}, sorry we missed you about {{position}}." },
+      {
+        agentId: "agent_fake",
+        noPickupSms: "Hi {{caller_name}}, sorry we missed you about {{position}} at {{company_name}} — interested?",
+        noPickupSmsFollowup: "Hi {{caller_name}}, sorry we missed you — {{call_reason}}",
+      },
     ]);
   });
 
@@ -139,6 +148,7 @@ describe("runToolCall", () => {
         position_details: "Node/Postgres",
         company_name: "Acme Inc.",
         questions: "Explain event loops; design a rate limiter.",
+        call_reason: "I had a question about your background.",
       }),
     );
 
@@ -151,6 +161,7 @@ describe("runToolCall", () => {
       caller_context: "Referral; backend experience.",
       company_name: "Acme Inc.",
       questions: "Explain event loops; design a rate limiter.",
+      call_reason: "I had a question about your background.",
     });
     expect(phoneCalls[0].metadata).toMatchObject({
       chatId: "chat_1",
