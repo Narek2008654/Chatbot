@@ -130,6 +130,25 @@ export class StreamController {
             },
           });
         },
+        saveEmail: async (email) => {
+          const person = await this.prisma.person.findUnique({
+            where: { userId_email: { userId, email: email.toEmail } },
+            select: { id: true },
+          });
+          await this.prisma.email.create({
+            data: {
+              userId,
+              personId: person?.id ?? null,
+              toEmail: email.toEmail,
+              toName: email.toName ?? null,
+              subject: email.subject,
+              body: email.body,
+              status: email.status,
+              providerMessageId: email.providerMessageId ?? null,
+              error: email.error ?? null,
+            },
+          });
+        },
       });
 
       for await (const chunk of reply) {
