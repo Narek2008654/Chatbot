@@ -6,6 +6,10 @@ export interface StreamHandlers {
   onError: (err: string) => void;
 }
 
+// Aborting (chat switch/unmount) is intentional, not a real error.
+const isAbortError = (err: unknown): boolean =>
+  err instanceof DOMException && err.name === "AbortError";
+
 export async function streamChat(
   chatId: string,
   content: string,
@@ -40,8 +44,7 @@ export async function streamChat(
       signal,
     });
   } catch (err) {
-    // Aborting (chat switch/unmount) is intentional, not a real error.
-    if (err instanceof DOMException && err.name === "AbortError") return;
+    if (isAbortError(err)) return;
     onError(String(err));
     return;
   }
@@ -115,8 +118,7 @@ export async function streamChat(
     // Flush any trailing bytes held by the TextDecoder (e.g. incomplete multi-byte sequences)
     buffer += decoder.decode();
   } catch (err) {
-    // Aborting (chat switch/unmount) is intentional, not a real error.
-    if (err instanceof DOMException && err.name === "AbortError") return;
+    if (isAbortError(err)) return;
     onError(String(err));
   } finally {
     reader.cancel().catch(() => {});
