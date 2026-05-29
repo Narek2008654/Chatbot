@@ -1,23 +1,11 @@
-import "reflect-metadata";
-import { NestFactory } from "@nestjs/core";
-import { ExpressAdapter } from "@nestjs/platform-express";
-import { Logger } from "@nestjs/common";
-import { createApp } from "../app.js";
-import { AppModule } from "../nest/app.module.js";
+import { bootstrap, type BootstrapOptions } from "../nest/bootstrap.js";
 
 /**
- * Bootstraps the same Nest-on-Express stack as src/index.ts so supertest hits
- * both Express routes and Nest controllers. Pass the same opts as createApp
- * (ai, retell, twilio, requireAuth).
+ * Test bootstrap — same wiring as src/index.ts but doesn't bind a port.
+ * Returns the Express instance (for supertest) and the Nest app (for cleanup).
  */
-export async function createTestServer(opts: Parameters<typeof createApp>[0] = {}) {
-  Logger.overrideLogger(false);
-  const express = createApp(opts);
-  const nest = await NestFactory.create(
-    AppModule.register({ ai: opts.ai, twilio: opts.twilio }),
-    new ExpressAdapter(express),
-    { logger: false },
-  );
+export async function createTestServer(opts: BootstrapOptions = {}) {
+  const nest = await bootstrap({ ...opts, silent: true });
   await nest.init();
-  return { express, nest };
+  return { express: nest.getHttpAdapter().getInstance(), nest };
 }

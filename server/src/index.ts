@@ -1,29 +1,18 @@
-import "reflect-metadata";
-import { NestFactory } from "@nestjs/core";
-import { ExpressAdapter } from "@nestjs/platform-express";
-import { createApp } from "./app.js";
 import { env } from "./env.js";
 import { createOpenAiClient } from "./ai/client.js";
 import { createRetellClient } from "./retell/client.js";
 import { createTwilioClient } from "./twilio/client.js";
 import { reconcileMissedCalls } from "./retell/reconcile.js";
-import { AppModule } from "./nest/app.module.js";
+import { bootstrap } from "./nest/bootstrap.js";
 
-// Build the live clients once and share them with both the HTTP app and the
+// Build the live clients once and share them with both the Nest app and the
 // background reconciler — avoids opening duplicate connections.
 const retell = createRetellClient(env.RETELL_API_KEY ?? "", { webhookUrl: env.RETELL_WEBHOOK_URL });
 const ai = createOpenAiClient(env.OPENAI_API_KEY ?? "", retell);
 const twilio = createTwilioClient(env.TWILIO_ACCOUNT_SID ?? "", env.TWILIO_AUTH_TOKEN ?? "");
 
-// Phase A: Nest hosts the HTTP server via the ExpressAdapter, wrapping the
-// existing Express instance. All current routes continue to work; new Nest
-// controllers (AppModule) are added on top and migration happens incrementally.
-const expressInstance = createApp({ ai, retell, twilio });
-const nestApp = await NestFactory.create(
-  AppModule.register({ ai, twilio }),
-  new ExpressAdapter(expressInstance),
-);
-await nestApp.listen(env.PORT);
+const app = await bootstrap({ ai, retell, twilio });
+await app.listen(env.PORT);
 console.log(`Server listening on http://localhost:${env.PORT}`);
 
 // Recover from missed webhook deliveries (ngrok blips, restarts, older agents
