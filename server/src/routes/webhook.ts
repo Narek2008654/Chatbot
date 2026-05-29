@@ -1,6 +1,4 @@
-import { Router } from "express";
 import { prisma } from "../db.js";
-import { env } from "../env.js";
 import type { AiClient } from "../ai/client.js";
 import type { TwilioClient } from "../twilio/client.js";
 
@@ -267,25 +265,3 @@ export async function handleCallEnded(ai: AiClient, twilio: TwilioClient, body: 
   });
 }
 
-export function createWebhookRouter(getAi: () => AiClient, getTwilio: () => TwilioClient): Router {
-  const router = Router();
-
-  // POST / — Retell posts call lifecycle events here. Not Clerk-authenticated
-  // (Retell isn't a user); guarded by an optional shared secret in the query.
-  router.post("/", async (req, res) => {
-    if (env.RETELL_WEBHOOK_SECRET && req.query.secret !== env.RETELL_WEBHOOK_SECRET) {
-      res.status(401).json({ error: "unauthorized" });
-      return;
-    }
-
-    // Always ack with 2xx — a failure on our side must not trigger Retell retries.
-    try {
-      await handleCallEnded(getAi(), getTwilio(), req.body);
-    } catch {
-      // best-effort: swallow and still acknowledge
-    }
-    res.status(200).json({ ok: true });
-  });
-
-  return router;
-}

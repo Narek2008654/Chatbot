@@ -11,7 +11,6 @@ import { createRetellClient } from "./retell/client.js";
 import type { TwilioClient } from "./twilio/client.js";
 import { createTwilioClient } from "./twilio/client.js";
 import { createStreamRouter } from "./routes/stream.js";
-import { createWebhookRouter } from "./routes/webhook.js";
 
 export function createApp(
   opts: { ai?: AiClient; retell?: RetellClient; twilio?: TwilioClient; requireAuth?: RequestHandler } = {},
@@ -49,9 +48,8 @@ export function createApp(
     res.json({ ok: true });
   });
 
-  // Retell webhook: posted by Retell (not a Clerk user), so mount it before the
-  // auth guard with its own JSON parser.
-  app.use("/api/retell/webhook", express.json(), createWebhookRouter(getAi, getTwilio));
+  // Retell webhook is now served by the Nest WebhookController; nothing to
+  // mount here. It stays outside the auth chain because Retell isn't a user.
 
   // Determine the auth guard to use.
   // When a custom requireAuth is injected (e.g. tests), skip clerkMiddleware entirely.

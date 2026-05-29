@@ -13,7 +13,11 @@ import { AppModule } from "../nest/app.module.js";
 export async function createTestServer(opts: Parameters<typeof createApp>[0] = {}) {
   Logger.overrideLogger(false);
   const express = createApp(opts);
-  const nest = await NestFactory.create(AppModule, new ExpressAdapter(express), { logger: false });
+  const nest = await NestFactory.create(
+    AppModule.register({ ai: opts.ai, twilio: opts.twilio }),
+    new ExpressAdapter(express),
+    { logger: false },
+  );
   await nest.init();
   return { express, nest };
 }

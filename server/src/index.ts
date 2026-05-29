@@ -19,7 +19,10 @@ const twilio = createTwilioClient(env.TWILIO_ACCOUNT_SID ?? "", env.TWILIO_AUTH_
 // existing Express instance. All current routes continue to work; new Nest
 // controllers (AppModule) are added on top and migration happens incrementally.
 const expressInstance = createApp({ ai, retell, twilio });
-const nestApp = await NestFactory.create(AppModule, new ExpressAdapter(expressInstance));
+const nestApp = await NestFactory.create(
+  AppModule.register({ ai, twilio }),
+  new ExpressAdapter(expressInstance),
+);
 await nestApp.listen(env.PORT);
 console.log(`Server listening on http://localhost:${env.PORT}`);
 
