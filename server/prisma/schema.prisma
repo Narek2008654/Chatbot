@@ -60,6 +60,7 @@ model Person {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   calls      Call[]
+  emails     Email[]
 
   @@unique([userId, email])
 }
@@ -94,6 +95,25 @@ model Call {
   summary             String   @default("")
   personEmail         String?
   createdAt           DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([personId])
+}
+
+// One outbound email sent through Brevo (job-details email to a contact).
+model Email {
+  id                String   @id @default(cuid())
+  userId            String
+  personId          String?
+  person            Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  toEmail           String
+  toName            String?
+  subject           String
+  body              String   @default("") // rendered HTML actually sent
+  status            String   // "sent" | "failed"
+  providerMessageId String?
+  error             String?
+  createdAt         DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([personId])
