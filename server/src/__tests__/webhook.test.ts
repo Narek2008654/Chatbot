@@ -1,5 +1,7 @@
 import request from "supertest";
-import { createApp } from "../app.js";
+import type { Express } from "express";
+import type { INestApplication } from "@nestjs/common";
+import { createTestServer } from "../test/createTestServer.js";
 import { prisma } from "../db.js";
 import { createFakeAi } from "../ai/fakeAi.js";
 import { createFakeTwilioClient, type SendSmsInput } from "../twilio/client.js";
@@ -8,11 +10,8 @@ import { fakeAuth } from "../test/fakeAuth.js";
 const USER = "user_test_webhook";
 
 const smsLog: SendSmsInput[] = [];
-const app = createApp({
-  ai: createFakeAi({ complete: async () => "Caller confirmed the interview for Tuesday at 3pm." }),
-  twilio: createFakeTwilioClient({ messages: smsLog }),
-  requireAuth: fakeAuth,
-});
+let app: Express;
+let nest: INestApplication;
 
 async function cleanup() {
   smsLog.length = 0;
@@ -22,11 +21,19 @@ async function cleanup() {
   await prisma.chat.deleteMany({ where: { userId: USER } });
 }
 
-beforeAll(cleanup);
+beforeAll(async () => {
+  await cleanup();
+  ({ express: app, nest } = await createTestServer({
+    ai: createFakeAi({ complete: async () => "Caller confirmed the interview for Tuesday at 3pm." }),
+    twilio: createFakeTwilioClient({ messages: smsLog }),
+    requireAuth: fakeAuth,
+  }));
+});
 beforeEach(() => {
   smsLog.length = 0;
 });
 afterAll(async () => {
+  await nest.close();
   await cleanup();
   await prisma.$disconnect();
 });

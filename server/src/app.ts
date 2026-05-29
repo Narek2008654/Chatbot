@@ -10,7 +10,7 @@ import type { RetellClient } from "./retell/client.js";
 import { createRetellClient } from "./retell/client.js";
 import type { TwilioClient } from "./twilio/client.js";
 import { createTwilioClient } from "./twilio/client.js";
-import { createChatsRouter } from "./routes/chats.js";
+import { createStreamRouter } from "./routes/stream.js";
 import { createWebhookRouter } from "./routes/webhook.js";
 
 export function createApp(
@@ -62,7 +62,9 @@ export function createApp(
 
   app.use(express.json());
 
-  app.use("/api/chats", guard, createChatsRouter(getAi));
+  // /api/chats: Nest serves CRUD endpoints; the legacy Express router still
+  // handles POST /:id/stream (SSE), which migrates last.
+  app.use("/api/chats", guard, createStreamRouter(getAi));
   // /api/calls and /api/memory are served by Nest controllers; the guard still
   // runs here so req.userId is populated before the controllers handle them.
   app.use("/api/calls", guard);

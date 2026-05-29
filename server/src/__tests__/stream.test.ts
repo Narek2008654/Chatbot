@@ -90,7 +90,7 @@ test("POST /api/chats/:id/stream saves user and assistant messages in DB", async
 
 test("POST /api/chats/:id/stream generates a title from the first message", async () => {
   // A dedicated app whose fake AI returns a deterministic title for `complete`.
-  const titledApp = createApp({
+  const { express: titledApp, nest: titledNest } = await createTestServer({
     ai: createFakeAi({ complete: async () => "Cats and Dogs" }),
     requireAuth: fakeAuth,
   });
@@ -108,10 +108,11 @@ test("POST /api/chats/:id/stream generates a title from the first message", asyn
 
   const chat = await prisma.chat.findUnique({ where: { id: newChatId } });
   expect(chat?.title).toBe("Cats and Dogs");
+  await titledNest.close();
 });
 
 test("POST /api/chats/:id/stream does not change the title on later turns", async () => {
-  const titledApp = createApp({
+  const { express: titledApp, nest: titledNest } = await createTestServer({
     ai: createFakeAi({ complete: async () => "Generated Title" }),
     requireAuth: fakeAuth,
   });
@@ -137,6 +138,7 @@ test("POST /api/chats/:id/stream does not change the title on later turns", asyn
     .send({ content: "second message" });
   const afterSecond = await prisma.chat.findUnique({ where: { id: newChatId } });
   expect(afterSecond?.title).toBe("Generated Title");
+  await titledNest.close();
 });
 
 test("POST /api/chats/:id/stream returns 404 when another user streams to user1's chat", async () => {

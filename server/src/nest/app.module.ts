@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { CallsController } from "./calls.controller.js";
+import { ChatsController } from "./chats.controller.js";
 import { FilesController } from "./files.controller.js";
 import { HealthController } from "./health.controller.js";
 import { MemoryController } from "./memory.controller.js";
@@ -12,7 +13,14 @@ import { UploadsController } from "./uploads.controller.js";
  * here own their paths fully.
  */
 @Module({
-  controllers: [HealthController, CallsController, MemoryController, FilesController, UploadsController],
+  controllers: [
+    HealthController,
+    CallsController,
+    ChatsController,
+    MemoryController,
+    FilesController,
+    UploadsController,
+  ],
   providers: [PrismaService],
 })
 export class AppModule {}

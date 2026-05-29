@@ -1,10 +1,13 @@
 import request from "supertest";
-import { createApp } from "../app.js";
+import type { Express } from "express";
+import type { INestApplication } from "@nestjs/common";
+import { createTestServer } from "../test/createTestServer.js";
 import { prisma } from "../db.js";
 import { createFakeAi } from "../ai/fakeAi.js";
 import { fakeAuth } from "../test/fakeAuth.js";
 
-const app = createApp({ ai: createFakeAi(), requireAuth: fakeAuth });
+let app: Express;
+let nest: INestApplication;
 
 const USER1 = "user_test_chats_1";
 const USER2 = "user_test_chats_2";
@@ -13,9 +16,13 @@ async function cleanup() {
   await prisma.chat.deleteMany({ where: { userId: { in: [USER1, USER2] } } });
 }
 
-beforeAll(cleanup);
+beforeAll(async () => {
+  await cleanup();
+  ({ express: app, nest } = await createTestServer({ ai: createFakeAi(), requireAuth: fakeAuth }));
+});
 
 afterAll(async () => {
+  await nest.close();
   await cleanup();
   await prisma.$disconnect();
 });
@@ -91,7 +98,7 @@ test("GET /api/chats/:id returns 404 for another user's chat", async () => {
     .set("x-test-user-id", USER2);
 
   expect(res.status).toBe(404);
-  expect(res.body).toEqual({ error: "not found" });
+  expect(res.body.message).toBe("Not Found");
 
   // Row still exists
   const row = await prisma.chat.findUnique({ where: { id: chatId } });
@@ -110,7 +117,7 @@ test("DELETE /api/chats/:id by another user returns 404 and row remains", async 
     .set("x-test-user-id", USER2);
 
   expect(res.status).toBe(404);
-  expect(res.body).toEqual({ error: "not found" });
+  expect(res.body.message).toBe("Not Found");
 
   const row = await prisma.chat.findUnique({ where: { id: chatId } });
   expect(row).not.toBeNull();
@@ -161,5 +168,5 @@ test("GET /api/chats/:id/messages returns 404 for another user's chat", async ()
     .set("x-test-user-id", USER2);
 
   expect(res.status).toBe(404);
-  expect(res.body).toEqual({ error: "not found" });
+  expect(res.body.message).toBe("Not Found");
 });

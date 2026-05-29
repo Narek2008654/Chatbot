@@ -1,9 +1,20 @@
 import request from "supertest";
-import { createApp } from "../app.js";
+import type { Express } from "express";
+import type { INestApplication } from "@nestjs/common";
+import { createTestServer } from "../test/createTestServer.js";
 import { createFakeAi } from "../ai/fakeAi.js";
 import { fakeAuth } from "../test/fakeAuth.js";
 
-const app = createApp({ ai: createFakeAi(), requireAuth: fakeAuth });
+let app: Express;
+let nest: INestApplication;
+
+beforeAll(async () => {
+  ({ express: app, nest } = await createTestServer({ ai: createFakeAi(), requireAuth: fakeAuth }));
+});
+
+afterAll(async () => {
+  await nest.close();
+});
 
 test("protected route returns 401 without an auth header", async () => {
   const res = await request(app).get("/api/chats");
