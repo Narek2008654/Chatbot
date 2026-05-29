@@ -27,6 +27,9 @@ dedicated **Calls** view.
 - **Retell webhook receiver** — `call_ended` events log the full call, fold it
   into the person's summary, post a notification into the originating chat,
   and (if configured) send a no-pickup follow-up SMS via Twilio.
+- **Job-details email** — when a contact expressed interest on a call and looks
+  like a good fit, the assistant emails them the role's key details and next
+  steps via Brevo (logged as an `Email` record, linked to the `Person`).
 - **Image uploads** (vision) and **voice dictation** for the chat input.
 
 ## Architecture
@@ -86,6 +89,7 @@ The chat model is given five tools (`server/src/ai/client.ts`):
 - Free [Clerk](https://dashboard.clerk.com) application (publishable + secret keys)
 - [RetellAI](https://dashboard.retellai.com) account (API key + at least one phone number)
 - [Twilio](https://console.twilio.com) account (the same one Retell uses for the trunk) — for SMS
+- [Brevo](https://app.brevo.com) account (API key + a verified sender email) — for sending job-details emails
 - For local webhook delivery: [ngrok](https://ngrok.com/download) or another HTTPS tunnel
 
 ## Getting started
@@ -155,6 +159,9 @@ It's idempotent — already-logged calls are no-ops.
 | `RETELL_FROM_NUMBER` | server | Default caller number (E.164, your Retell-registered Twilio number) |
 | `RETELL_WEBHOOK_SECRET` | server | Optional shared secret; if set, webhook URL must include `?secret=…` |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` | server | Twilio creds for sending the no-pickup SMS |
+| `BREVO_API_KEY` | server | Brevo transactional email API key |
+| `BREVO_FROM_EMAIL` | server | Verified sender email (must be a verified sender/domain in Brevo) |
+| `BREVO_FROM_NAME` | server | Sender display name (default `Recruiting`) |
 | `VITE_CLERK_PUBLISHABLE_KEY` | client | Clerk publishable key (for `<ClerkProvider>`) |
 | `VITE_API_URL` | client | Base URL of the API server |
 
